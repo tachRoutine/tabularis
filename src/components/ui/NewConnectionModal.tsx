@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import clsx from 'clsx';
@@ -30,25 +30,55 @@ interface SavedConnection {
 interface NewConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave?: (connection: SavedConnection) => void;
+  onSave?: () => void;
+  initialConnection?: SavedConnection | null;
 }
 
-export const NewConnectionModal = ({ isOpen, onClose, onSave }: NewConnectionModalProps) => {
+export const NewConnectionModal = ({ isOpen, onClose, onSave, initialConnection }: NewConnectionModalProps) => {
   const [driver, setDriver] = useState<Driver>('postgres');
   const [name, setName] = useState('');
   const [formData, setFormData] = useState<Partial<ConnectionParams>>({
     host: 'localhost',
     port: 5432,
     username: 'postgres',
-    database: 'postgres'
+    database: 'postgres',
+    ssh_enabled: false,
+    ssh_port: 22
   });
   const [status, setStatus] = useState<'idle' | 'testing' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+
+  // Populate form on open if editing
+  useEffect(() => {
+      if (isOpen) {
+          if (initialConnection) {
+              setName(initialConnection.name);
+              setDriver(initialConnection.params.driver);
+              setFormData({ ...initialConnection.params });
+          } else {
+              // Reset to defaults
+              setName('');
+              setDriver('postgres');
+              setFormData({
+                host: 'localhost',
+                port: 5432,
+                username: 'postgres',
+                database: 'postgres',
+                ssh_enabled: false,
+                ssh_port: 22
+              });
+          }
+          setStatus('idle');
+          setMessage('');
+      }
+  }, [isOpen, initialConnection]);
 
   if (!isOpen) return null;
 
   const handleDriverChange = (newDriver: Driver) => {
     setDriver(newDriver);
+    // Only reset if creating new, or be careful not to wipe existing data being edited?
+    // Let's assume switching driver resets defaults for convenience.
     setFormData(prev => ({
       ...prev,
       port: newDriver === 'postgres' ? 5432 : newDriver === 'mysql' ? 3306 : undefined,
@@ -77,8 +107,10 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave }: NewConnectionMod
       setMessage(result);
       return true;
     } catch (err: any) {
+      console.error("Connection test error:", err);
       setStatus('error');
-      setMessage(typeof err === 'string' ? err : 'Connection failed');
+      const msg = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+      setMessage(msg);
       return false;
     }
   };
@@ -92,15 +124,28 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave }: NewConnectionMod
 
     setStatus('saving');
     try {
-      const saved = await invoke<SavedConnection>('save_connection', {
-        name,
-        params: {
+      const params = {
           driver,
           ...formData,
           port: Number(formData.port)
-        }
-      });
-      if (onSave) onSave(saved);
+      };
+
+      if (initialConnection) {
+          // Update
+          await invoke('update_connection', {
+              id: initialConnection.id,
+              name,
+              params
+          });
+      } else {
+          // Create
+          await invoke('save_connection', {
+              name,
+              params
+          });
+      }
+      
+      if (onSave) onSave();
       onClose();
     } catch (err: any) {
       setStatus('error');

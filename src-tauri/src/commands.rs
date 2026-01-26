@@ -9,6 +9,7 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager, Runtime};
 use uuid::Uuid;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, DateTime, Utc};
+use crate::ssh_tunnel::{SshTunnel, get_tunnels};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct ConnectionParams {
@@ -56,6 +57,53 @@ pub struct QueryResult {
 }
 
 // --- Persistence Helpers ---
+
+fn resolve_connection_params(params: &ConnectionParams) -> Result<ConnectionParams, String> {
+    if params.ssh_enabled.unwrap_or(false) {
+        let ssh_host = params.ssh_host.as_deref().ok_or("Missing SSH Host")?;
+        let ssh_port = params.ssh_port.unwrap_or(22);
+        let ssh_user = params.ssh_user.as_deref().ok_or("Missing SSH User")?;
+        let remote_host = params.host.as_deref().unwrap_or("localhost");
+        let remote_port = params.port.unwrap_or(3306);
+
+        let map_key = format!("{}@{}:{}:{}->{}", ssh_user, ssh_host, ssh_port, remote_host, remote_port);
+        
+        // Check existing
+        {
+            let tunnels = get_tunnels().lock().unwrap();
+            if let Some(tunnel) = tunnels.get(&map_key) {
+                // Should check if alive? 
+                // For MVP assume alive.
+                let mut new_params = params.clone();
+                new_params.host = Some("127.0.0.1".to_string());
+                new_params.port = Some(tunnel.local_port);
+                return Ok(new_params);
+            }
+        }
+        
+        // New Tunnel
+        let tunnel = SshTunnel::new(
+            ssh_host, ssh_port, ssh_user, 
+            params.ssh_password.as_deref(), 
+            params.ssh_key_file.as_deref(),
+            remote_host, remote_port
+        )?;
+        
+        let local_port = tunnel.local_port;
+        
+        {
+            let mut tunnels = get_tunnels().lock().unwrap();
+            tunnels.insert(map_key, tunnel);
+        }
+        
+        let mut new_params = params.clone();
+        new_params.host = Some("127.0.0.1".to_string());
+        new_params.port = Some(local_port);
+        Ok(new_params)
+    } else {
+        Ok(params.clone())
+    }
+}
 
 fn get_config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
@@ -108,6 +156,50 @@ pub async fn save_connection<R: Runtime>(
 }
 
 #[tauri::command]
+pub async fn delete_connection<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+) -> Result<(), String> {
+    let path = get_config_path(&app)?;
+    if !path.exists() { return Ok(()); }
+    
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
+    
+    connections.retain(|c| c.id != id);
+    
+    let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_connection<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    name: String,
+    params: ConnectionParams,
+) -> Result<SavedConnection, String> {
+    let path = get_config_path(&app)?;
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
+    
+    let conn_idx = connections.iter().position(|c| c.id == id).ok_or("Connection not found")?;
+    
+    let updated = SavedConnection {
+        id: id.clone(),
+        name,
+        params,
+    };
+    
+    connections[conn_idx] = updated.clone();
+    
+    let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())?;
+    Ok(updated)
+}
+
+#[tauri::command]
 pub async fn get_connections<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<Vec<SavedConnection>, String> {
@@ -122,14 +214,15 @@ pub async fn get_connections<R: Runtime>(
 
 #[tauri::command]
 pub async fn test_connection(params: ConnectionParams) -> Result<String, String> {
-    let url = match params.driver.as_str() {
-        "sqlite" => format!("sqlite://{}", params.database),
+    let resolved_params = resolve_connection_params(&params)?;
+    let url = match resolved_params.driver.as_str() {
+        "sqlite" => format!("sqlite://{}", resolved_params.database),
         "postgres" => format!("postgres://{}:{}@{}:{}/{}", 
-            params.username.clone().unwrap_or_default(), params.password.clone().unwrap_or_default(),
-            params.host.clone().unwrap_or("localhost".into()), params.port.unwrap_or(5432), params.database),
+            resolved_params.username.clone().unwrap_or_default(), resolved_params.password.clone().unwrap_or_default(),
+            resolved_params.host.clone().unwrap_or("localhost".into()), resolved_params.port.unwrap_or(5432), resolved_params.database),
         "mysql" => format!("mysql://{}:{}@{}:{}/{}", 
-            params.username.clone().unwrap_or_default(), params.password.clone().unwrap_or_default(),
-            params.host.clone().unwrap_or("localhost".into()), params.port.unwrap_or(3306), params.database),
+            resolved_params.username.clone().unwrap_or_default(), resolved_params.password.clone().unwrap_or_default(),
+            resolved_params.host.clone().unwrap_or("localhost".into()), resolved_params.port.unwrap_or(3306), resolved_params.database),
         _ => return Err("Unsupported driver".into()),
     };
     
@@ -145,10 +238,11 @@ pub async fn get_tables<R: Runtime>(
     connection_id: String,
 ) -> Result<Vec<TableInfo>, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => get_tables_mysql(&saved_conn.params).await,
-        "postgres" => get_tables_postgres(&saved_conn.params).await,
-        "sqlite" => get_tables_sqlite(&saved_conn.params).await,
+        "mysql" => get_tables_mysql(&params).await,
+        "postgres" => get_tables_postgres(&params).await,
+        "sqlite" => get_tables_sqlite(&params).await,
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -160,10 +254,11 @@ pub async fn get_columns<R: Runtime>(
     table_name: String,
 ) -> Result<Vec<TableColumn>, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => get_columns_mysql(&saved_conn.params, &table_name).await,
-        "postgres" => get_columns_postgres(&saved_conn.params, &table_name).await,
-        "sqlite" => get_columns_sqlite(&saved_conn.params, &table_name).await,
+        "mysql" => get_columns_mysql(&params, &table_name).await,
+        "postgres" => get_columns_postgres(&params, &table_name).await,
+        "sqlite" => get_columns_sqlite(&params, &table_name).await,
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -177,10 +272,11 @@ pub async fn delete_record<R: Runtime>(
     pk_val: serde_json::Value,
 ) -> Result<u64, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => delete_record_mysql(&saved_conn.params, &table, &pk_col, pk_val).await,
-        "postgres" => delete_record_postgres(&saved_conn.params, &table, &pk_col, pk_val).await,
-        "sqlite" => delete_record_sqlite(&saved_conn.params, &table, &pk_col, pk_val).await,
+        "mysql" => delete_record_mysql(&params, &table, &pk_col, pk_val).await,
+        "postgres" => delete_record_postgres(&params, &table, &pk_col, pk_val).await,
+        "sqlite" => delete_record_sqlite(&params, &table, &pk_col, pk_val).await,
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -196,10 +292,11 @@ pub async fn update_record<R: Runtime>(
     new_val: serde_json::Value,
 ) -> Result<u64, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => update_record_mysql(&saved_conn.params, &table, &pk_col, pk_val, &col_name, new_val).await,
-        "postgres" => update_record_postgres(&saved_conn.params, &table, &pk_col, pk_val, &col_name, new_val).await,
-        "sqlite" => update_record_sqlite(&saved_conn.params, &table, &pk_col, pk_val, &col_name, new_val).await,
+        "mysql" => update_record_mysql(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
+        "postgres" => update_record_postgres(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
+        "sqlite" => update_record_sqlite(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -212,10 +309,11 @@ pub async fn insert_record<R: Runtime>(
     data: std::collections::HashMap<String, serde_json::Value>,
 ) -> Result<u64, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => insert_record_mysql(&saved_conn.params, &table, data).await,
-        "postgres" => insert_record_postgres(&saved_conn.params, &table, data).await,
-        "sqlite" => insert_record_sqlite(&saved_conn.params, &table, data).await,
+        "mysql" => insert_record_mysql(&params, &table, data).await,
+        "postgres" => insert_record_postgres(&params, &table, data).await,
+        "sqlite" => insert_record_sqlite(&params, &table, data).await,
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -721,10 +819,11 @@ pub async fn execute_query<R: Runtime>(
     query: String,
 ) -> Result<QueryResult, String> {
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
+    let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
-        "mysql" => execute_mysql(&saved_conn.params, &query).await,
-        "postgres" => execute_postgres(&saved_conn.params, &query).await,
-        "sqlite" => execute_sqlite(&saved_conn.params, &query).await,
+        "mysql" => execute_mysql(&params, &query).await,
+        "postgres" => execute_postgres(&params, &query).await,
+        "sqlite" => execute_sqlite(&params, &query).await,
         _ => Err("Unsupported driver".into())
     }
 }

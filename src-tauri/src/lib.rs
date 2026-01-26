@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod ssh_tunnel;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,6 +13,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::test_connection,
             commands::save_connection,
+            commands::delete_connection,
+            commands::update_connection,
             commands::get_connections,
             commands::get_tables,
             commands::get_columns,

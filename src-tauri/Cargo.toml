@@ -27,3 +27,4 @@ uuid = { version = "1.20.0", features = ["v4", "serde"] }
 chrono = { version = "0.4.43", features = ["serde"] }
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
+ssh2 = "0.9.5"
