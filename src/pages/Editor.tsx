@@ -200,12 +200,17 @@ export const Editor = () => {
   useEffect(() => {
     const state = location.state as any;
     if (activeConnectionId && state?.initialQuery) {
-      const queryKey = `${state.initialQuery}-${state.tableName}`;
+      const queryKey = `${state.initialQuery}-${state.tableName}-${state.queryName}`;
       if (processingRef.current === queryKey) return;
       processingRef.current = queryKey;
 
-      const { initialQuery: sql, tableName: table } = state;
-      const tabId = addTab({ type: table ? 'table' : 'console', title: table, query: sql, activeTable: table });
+      const { initialQuery: sql, tableName: table, queryName } = state;
+      const tabId = addTab({ 
+        type: table ? 'table' : 'console', 
+        title: queryName || table || 'Console', 
+        query: sql, 
+        activeTable: table 
+      });
       
       if (tabId) runQuery(sql, 1, tabId);
       

@@ -77,9 +77,9 @@ export const Sidebar = () => {
 
   const getQuote = () => (activeDriver === 'mysql' || activeDriver === 'mariadb') ? '`' : '"';
 
-  const runQuery = (sql: string) => {
+  const runQuery = (sql: string, queryName?: string) => {
     navigate('/editor', {
-      state: { initialQuery: sql }
+      state: { initialQuery: sql, queryName }
     });
   };
 
@@ -159,7 +159,7 @@ export const Sidebar = () => {
                             {queries.map(q => (
                                 <div 
                                     key={q.id}
-                                    onClick={() => runQuery(q.sql)}
+                                    onClick={() => runQuery(q.sql, q.name)}
                                     onContextMenu={(e) => handleContextMenu(e, 'query', q.id, q.name, q)}
                                     className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer group transition-colors"
                                     title={q.name}
@@ -277,7 +277,7 @@ export const Sidebar = () => {
                     label: 'Execute',
                     icon: Play,
                     action: () => {
-                        if (contextMenu.data?.sql) runQuery(contextMenu.data.sql);
+                        if (contextMenu.data?.sql) runQuery(contextMenu.data.sql, contextMenu.data.name);
                     }
                 },
                 {
