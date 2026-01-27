@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Play, Loader2, Plus, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Square, ChevronDown, Save } from 'lucide-react';
+import { Play, Plus, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Square, ChevronDown, Save } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useDatabase } from '../contexts/DatabaseContext';
