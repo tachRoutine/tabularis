@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Database, Terminal, Settings, Table as TableIcon, Loader2, Copy, Hash, PlaySquare, FileText, Plus, ChevronRight, ChevronDown, FileCode, Play, Edit, Trash2 } from 'lucide-react';
+import { Database, Terminal, Settings, Table as TableIcon, Loader2, Copy, Hash, PlaySquare, FileText, Plus, ChevronRight, ChevronDown, FileCode, Play, Edit, Trash2, PanelLeftClose, PanelLeft } from 'lucide-react';
 import clsx from 'clsx';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useDatabase } from '../../hooks/useDatabase';
@@ -73,6 +73,7 @@ export const Sidebar = () => {
   const [queriesOpen, setQueriesOpen] = useState(false);
   const [tablesOpen, setTablesOpen] = useState(true);
   const [queryModal, setQueryModal] = useState<{ isOpen: boolean; query?: SavedQuery }>({ isOpen: false });
+  const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
 
   const getQuote = () => (activeDriver === 'mysql' || activeDriver === 'mariadb') ? '`' : '"';
 
@@ -121,11 +122,20 @@ export const Sidebar = () => {
       </aside>
 
       {/* Secondary Sidebar (Schema Explorer) - Only visible when connected and not in settings or home */}
-      {activeConnectionId && location.pathname !== '/settings' && location.pathname !== '/' && (
+      {activeConnectionId && location.pathname !== '/settings' && location.pathname !== '/' && !isExplorerCollapsed && (
         <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col">
-          <div className="p-4 border-b border-slate-800 font-semibold text-sm text-slate-200 flex items-center gap-2">
-            <Database size={16} className="text-blue-400"/>
-            <span>Explorer</span>
+          <div className="p-4 border-b border-slate-800 font-semibold text-sm text-slate-200 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Database size={16} className="text-blue-400"/>
+              <span>Explorer</span>
+            </div>
+            <button
+              onClick={() => setIsExplorerCollapsed(true)}
+              className="text-slate-500 hover:text-slate-300 transition-colors p-1 hover:bg-slate-800 rounded"
+              title="Collapse Explorer"
+            >
+              <PanelLeftClose size={16} />
+            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto py-2">
@@ -184,6 +194,11 @@ export const Sidebar = () => {
                             {tables.map(table => (
                                 <div 
                                     key={table.name}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.setData('application/reactflow', table.name);
+                                        e.dataTransfer.effectAllowed = 'move';
+                                    }}
                                     onClick={() => handleTableClick(table.name)}
                                     onContextMenu={(e) => handleContextMenu(e, 'table', table.name, table.name)}
                                     className={clsx(
@@ -204,6 +219,22 @@ export const Sidebar = () => {
             )}
           </div>
         </aside>
+      )}
+
+      {/* Collapsed Explorer (Icon only) */}
+      {activeConnectionId && location.pathname !== '/settings' && location.pathname !== '/' && isExplorerCollapsed && (
+        <div className="w-12 bg-slate-950 border-r border-slate-800 flex flex-col items-center py-4">
+          <button
+            onClick={() => setIsExplorerCollapsed(false)}
+            className="text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg p-2 transition-colors group relative"
+            title="Expand Explorer"
+          >
+            <PanelLeft size={20} />
+            <span className="absolute left-14 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+              Expand Explorer
+            </span>
+          </button>
+        </div>
       )}
 
       {/* Context Menu */}

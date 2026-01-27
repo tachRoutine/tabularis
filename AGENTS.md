@@ -187,3 +187,47 @@ Adhere to the rules defined in the [rules directory](./.rules/):
 - **Next Steps:**
     - Multi-statement execution (running all queries in a tab).
     - Database export/dump.
+
+### Session 19: Visual Query Builder
+- **Status:** Feature Complete.
+- **Actions:**
+    - **Frontend:**
+        - **Visual Query Builder:** Implemented DataGrip-style visual query builder using ReactFlow.
+        - **Table Nodes:** Created draggable table nodes with column selection and handles for joining.
+        - **JOIN Support:** Implemented visual JOIN creation by connecting column handles between tables.
+        - **JOIN Type Selection:** Added clickable edge labels to cycle through JOIN types (INNER, LEFT, RIGHT, FULL OUTER, CROSS).
+        - **Query Settings Panel:** Added collapsible sidebar with advanced query controls:
+            - WHERE/HAVING conditions builder with:
+                - AND/OR toggle buttons between conditions
+                - Aggregate function checkbox to convert WHERE to HAVING
+                - Column/operator/value inputs
+                - Support for LIKE, IN, comparison operators
+            - GROUP BY clause with column selection.
+            - ORDER BY clause with column and direction (ASC ↑ / DESC ↓).
+            - LIMIT input control.
+        - **Aggregate Functions:** Implemented per-column aggregation support (COUNT, COUNT DISTINCT, SUM, AVG, MIN, MAX) with optional aliases.
+        - **Dark Theme Styling:** Customized ReactFlow controls, minimap, and edges for dark theme consistency.
+            - Fixed select dropdown visibility (dark background with light text)
+            - Improved spacing and padding throughout
+            - Color-coded section icons (WHERE=blue, GROUP BY=purple, ORDER BY=green, LIMIT=orange)
+        - **SQL Generation:** Automatic SQL generation with support for:
+            - Multi-table SELECT with column selection.
+            - JOIN clauses with proper relationship detection and type selection.
+            - WHERE clauses with AND/OR logic.
+            - HAVING clauses for aggregate conditions.
+            - GROUP BY, ORDER BY, and LIMIT clauses.
+            - Aggregate functions with aliases.
+        - **Tab Integration:** Added new tab type `query_builder` with Network icon and "New Visual Query" button.
+        - **Run Button Integration:** Enhanced Run button to execute generated SQL from query builder directly.
+    - **Types:**
+        - Added `FlowState` interface with proper ReactFlow types.
+        - Extended `Tab` interface to support `flowState` for persisting query builder state.
+        - Enhanced `WhereCondition` with `logicalOperator` and `isAggregate` fields.
+    - **Components:**
+        - Created `VisualQueryBuilder.tsx` - Main query builder component with ReactFlow canvas.
+        - Created `TableNode.tsx` - Custom node component for database tables with aggregate function UI.
+        - Created `JoinEdge.tsx` - Custom edge component with clickable JOIN type labels.
+    - **CSS:**
+        - Added ReactFlow dark theme overrides to `index.css`.
+        - Fixed select dropdown option visibility.
+        - Styled controls, minimap, edges, and custom scrollbars.

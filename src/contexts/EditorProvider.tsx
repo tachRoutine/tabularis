@@ -78,7 +78,13 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
           title = partial.activeTable;
         } else {
           const consoleCount = prev.filter(t => t.connectionId === activeConnectionId && t.type === 'console').length;
-          title = consoleCount === 0 ? "Console" : `Console ${consoleCount + 1}`;
+          const queryBuilderCount = prev.filter(t => t.connectionId === activeConnectionId && t.type === 'query_builder').length;
+          
+          if (partial?.type === 'query_builder') {
+             title = queryBuilderCount === 0 ? "Visual Query" : `Visual Query ${queryBuilderCount + 1}`;
+          } else {
+             title = consoleCount === 0 ? "Console" : `Console ${consoleCount + 1}`;
+          }
         }
       }
       const newTab = createInitialTab({ id, title, connectionId: activeConnectionId, ...partial });
@@ -105,7 +111,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
         const closedIdx = prev.findIndex(t => t.id === id);
         const nextActiveIdx = Math.min(closedIdx, connTabs.length > 0 ? connTabs.length - 1 : 0);
         const nextActiveTab = connTabs[nextActiveIdx];
-        if (nextActiveTab) {
+        if (nextActiveTab && activeConnectionId) {
           setActiveTabIds(prevIds => ({ ...prevIds, [activeConnectionId]: nextActiveTab.id }));
         }
       }

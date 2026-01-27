@@ -6,11 +6,13 @@ import {
   Download,
   Square,
   ChevronDown,
+  ChevronUp,
   Save,
   X,
   Database,
   Table as TableIcon,
   FileCode,
+  Network,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -18,6 +20,7 @@ import { DataGrid } from "../components/ui/DataGrid";
 import { NewRowModal } from "../components/ui/NewRowModal";
 import { QuerySelectionModal } from "../components/ui/QuerySelectionModal";
 import { QueryModal } from "../components/ui/QueryModal";
+import { VisualQueryBuilder } from "../components/ui/VisualQueryBuilder";
 import { splitQueries } from "../utils/sql";
 import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -57,6 +60,7 @@ export const Editor = () => {
   const [showNewRowModal, setShowNewRowModal] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [editorHeight, setEditorHeight] = useState(300);
+  const [isResultsCollapsed, setIsResultsCollapsed] = useState(false);
   const isDragging = useRef(false);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
@@ -283,14 +287,15 @@ export const Editor = () => {
           {tabs.map((tab) => (
             <div key={tab.id} onClick={() => setActiveTabId(tab.id)} className={clsx("flex items-center gap-2 px-3 h-full border-r border-slate-800 cursor-pointer min-w-[140px] max-w-[220px] text-xs transition-all group relative select-none", activeTabId === tab.id ? "bg-slate-950 text-slate-100 font-medium" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300")}>
               {activeTabId === tab.id && <div className="absolute top-0 left-0 right-0 h-[2px] bg-blue-500" />}
-              {tab.type === 'table' ? <TableIcon size={12} className="text-blue-400 shrink-0" /> : <FileCode size={12} className="text-green-500 shrink-0" />}
+              {tab.type === 'table' ? <TableIcon size={12} className="text-blue-400 shrink-0" /> : tab.type === 'query_builder' ? <Network size={12} className="text-purple-400 shrink-0" /> : <FileCode size={12} className="text-green-500 shrink-0" />}
               <span className="truncate flex-1">{tab.title}</span>
               <button onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }} className={clsx("p-0.5 rounded-sm hover:bg-slate-700 transition-opacity shrink-0", activeTabId === tab.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}><X size={12} /></button>
               {tab.isLoading && <div className="absolute bottom-0 left-0 h-0.5 bg-blue-500 animate-pulse w-full" />}
             </div>
           ))}
         </div>
-        <button onClick={() => addTab({ type: 'console' })} className="flex items-center justify-center w-9 h-full text-slate-500 hover:text-white hover:bg-slate-800 border-l border-slate-800 transition-colors shrink-0"><Plus size={16} /></button>
+        <button onClick={() => addTab({ type: 'console' })} className="flex items-center justify-center w-9 h-full text-slate-500 hover:text-white hover:bg-slate-800 border-l border-slate-800 transition-colors shrink-0" title="New Console"><Plus size={16} /></button>
+        <button onClick={() => addTab({ type: 'query_builder' })} className="flex items-center justify-center w-9 h-full text-purple-500 hover:text-white hover:bg-slate-800 border-l border-slate-800 transition-colors shrink-0" title="New Visual Query"><Network size={16} /></button>
       </div>
 
       {/* Toolbar */}
@@ -339,21 +344,56 @@ export const Editor = () => {
         {activeTab.activeTable && activeTab.pkColumn && <div className="ml-auto flex items-center gap-3"><button onClick={() => setShowNewRowModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium"><Plus size={16} /> New Row</button><span className="text-xs text-blue-400 border border-blue-900 bg-blue-900/20 px-2 py-0.5 rounded shrink-0">Editing: {activeTab.activeTable}</span></div>}
       </div>
 
-      <div style={{ height: editorHeight }} className="relative">
-        <MonacoEditor height="100%" defaultLanguage="sql" theme="vs-dark" value={activeTab.query} onChange={(val) => updateActiveTab({ query: val || "" })} onMount={handleEditorMount} options={{ minimap: { enabled: false }, fontSize: 14, padding: { top: 16 }, scrollBeyondLastLine: false, automaticLayout: true }} />
+      <div style={{ height: isResultsCollapsed ? 'calc(100vh - 109px)' : editorHeight }} className="relative">
+        {activeTab.type === 'query_builder' ? (
+          <VisualQueryBuilder />
+        ) : (
+          <MonacoEditor height="100%" defaultLanguage="sql" theme="vs-dark" value={activeTab.query} onChange={(val) => updateActiveTab({ query: val || "" })} onMount={handleEditorMount} options={{ minimap: { enabled: false }, fontSize: 14, padding: { top: 16 }, scrollBeyondLastLine: false, automaticLayout: true }} />
+        )}
       </div>
-      <div onMouseDown={startResize} className="h-2 bg-slate-900 border-y border-slate-800 cursor-row-resize hover:bg-blue-600/50 transition-colors flex items-center justify-center group"><div className="w-8 h-1 bg-slate-700 rounded-full group-hover:bg-white/50" /></div>
-
-      <div className="flex-1 overflow-hidden bg-slate-900 flex flex-col min-h-0">
-        {activeTab.error ? <div className="p-4 text-red-400 font-mono text-sm bg-red-900/10 h-full overflow-auto whitespace-pre-wrap">Error: {activeTab.error}</div> : activeTab.result ? (
-          <div className="flex-1 min-h-0 flex flex-col">
-            <div className="p-2 bg-slate-900 text-xs text-slate-400 border-b border-slate-800 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-4"><span>{activeTab.result.rows.length} rows retrieved {activeTab.executionTime !== null && <span className="text-slate-500 ml-2 font-mono">({formatDuration(activeTab.executionTime)})</span>}</span></div>
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden"><DataGrid columns={activeTab.result.columns} data={activeTab.result.rows} tableName={activeTab.activeTable} pkColumn={activeTab.pkColumn} connectionId={activeConnectionId} onRefresh={handleRefresh} /></div>
+      
+      {/* Resize Bar & Results Panel */}
+      {!isResultsCollapsed ? (
+        <>
+          <div onMouseDown={startResize} className="h-2 bg-slate-900 border-y border-slate-800 cursor-row-resize hover:bg-blue-600/50 transition-colors flex items-center justify-center group">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsResultsCollapsed(true);
+              }}
+              className="px-3 py-0.5 bg-slate-800 rounded-full border border-slate-700 hover:border-slate-600 transition-colors flex items-center gap-1.5"
+              title="Hide Results Panel"
+            >
+              <ChevronDown size={14} />
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Hide Results</span>
+            </button>
           </div>
-        ) : <div className="flex items-center justify-center h-full text-slate-600 text-sm">Execute a query to see results</div>}
-      </div>
+
+          {/* Results Panel */}
+          <div className="flex-1 overflow-hidden bg-slate-900 flex flex-col min-h-0">
+            {activeTab.error ? <div className="p-4 text-red-400 font-mono text-sm bg-red-900/10 h-full overflow-auto whitespace-pre-wrap">Error: {activeTab.error}</div> : activeTab.result ? (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="p-2 bg-slate-900 text-xs text-slate-400 border-b border-slate-800 flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-4"><span>{activeTab.result.rows.length} rows retrieved {activeTab.executionTime !== null && <span className="text-slate-500 ml-2 font-mono">({formatDuration(activeTab.executionTime)})</span>}</span></div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden"><DataGrid columns={activeTab.result.columns} data={activeTab.result.rows} tableName={activeTab.activeTable} pkColumn={activeTab.pkColumn} connectionId={activeConnectionId} onRefresh={handleRefresh} /></div>
+              </div>
+            ) : <div className="flex items-center justify-center h-full text-slate-600 text-sm">Execute a query to see results</div>}
+          </div>
+        </>
+      ) : (
+        // Show Results Button (when collapsed)
+        <div className="h-8 bg-slate-900 border-t border-slate-800 flex items-center justify-center">
+          <button
+            onClick={() => setIsResultsCollapsed(false)}
+            className="px-3 py-1 bg-slate-800 rounded-full border border-slate-700 hover:border-slate-600 transition-colors flex items-center gap-1.5"
+            title="Show Results Panel"
+          >
+            <ChevronUp size={14} />
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Show Results</span>
+          </button>
+        </div>
+      )}
 
       {activeTab.activeTable && <NewRowModal isOpen={showNewRowModal} onClose={() => setShowNewRowModal(false)} tableName={activeTab.activeTable} onSaveSuccess={handleRefresh} />}
       <QuerySelectionModal isOpen={isQuerySelectionModalOpen} queries={selectableQueries} onSelect={(q) => { runQuery(q, 1); setIsQuerySelectionModalOpen(false); }} onClose={() => setIsQuerySelectionModalOpen(false)} />

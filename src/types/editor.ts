@@ -12,10 +12,17 @@ export interface QueryResult {
   pagination?: Pagination;
 }
 
+import type { Node, Edge } from '@xyflow/react';
+
+export interface FlowState {
+  nodes: Node[];
+  edges: Edge[];
+}
+
 export interface Tab {
   id: string;
   title: string;
-  type: 'console' | 'table';
+  type: 'console' | 'table' | 'query_builder';
   query: string;
   result: QueryResult | null;
   error: string;
@@ -25,4 +32,5 @@ export interface Tab {
   pkColumn: string | null;
   isLoading?: boolean;
   connectionId: string;
+  flowState?: FlowState;
 }

@@ -1,0 +1,154 @@
+import { memo, useState } from 'react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import clsx from 'clsx';
+
+export interface ColumnAggregation {
+  function?: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'COUNT_DISTINCT' | '';
+  alias?: string;
+}
+
+export interface ColumnAlias {
+  alias?: string;
+}
+
+export interface TableNodeData extends Record<string, unknown> {
+  label: string;
+  columns: { name: string; type: string }[];
+  selectedColumns: Record<string, boolean>;
+  columnAggregations: Record<string, ColumnAggregation>;
+  columnAliases: Record<string, ColumnAlias>;
+  onColumnCheck: (column: string, checked: boolean) => void;
+  onColumnAggregation: (column: string, aggregation: ColumnAggregation) => void;
+  onColumnAlias: (column: string, alias: string) => void;
+}
+
+export type TableNode = Node<TableNodeData, 'table'>;
+
+export const TableNodeComponent = memo(({ data }: NodeProps<TableNode>) => {
+  const [expandedColumn, setExpandedColumn] = useState<string | null>(null);
+
+  return (
+    <div className="bg-slate-800 border border-slate-600 rounded shadow-lg min-w-[200px] overflow-hidden">
+      <div className="bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 border-b border-slate-700 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-blue-500" />
+        {data.label}
+      </div>
+      <div className="p-2 flex flex-col gap-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+        {data.columns.map((col) => {
+          const isExpanded = expandedColumn === col.name;
+          const aggregation = data.columnAggregations?.[col.name];
+          const columnAlias = data.columnAliases?.[col.name];
+          
+          return (
+            <div key={col.name} className="group relative">
+              <div className="flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 py-0.5">
+                <label className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                    checked={!!data.selectedColumns[col.name]}
+                    onChange={(e) => data.onColumnCheck(col.name, e.target.checked)}
+                  />
+                  <span className="truncate">{col.name}</span>
+                  {aggregation?.function && (
+                    <span className="text-purple-400 text-[9px] font-mono bg-purple-500/10 px-1 rounded">
+                      {aggregation.function}
+                    </span>
+                  )}
+                  {columnAlias?.alias && (
+                    <span className="text-green-400 text-[9px] font-mono bg-green-500/10 px-1 rounded">
+                      as {columnAlias.alias}
+                    </span>
+                  )}
+                  <span className="text-slate-600 text-[10px] ml-auto font-mono">{col.type}</span>
+                </label>
+                {data.selectedColumns[col.name] && (
+                  <button
+                    onClick={() => setExpandedColumn(isExpanded ? null : col.name)}
+                    className={clsx(
+                      "ml-2 text-slate-500 transition-colors p-0.5 rounded",
+                      isExpanded ? "bg-purple-500/20 text-purple-400" : "hover:text-purple-400"
+                    )}
+                    title={isExpanded ? "Close options" : "Column options"}
+                  >
+                    <span className="text-[10px]">{isExpanded ? '✕' : '⚙'}</span>
+                  </button>
+                )}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={col.name}
+                  className="!w-2 !h-2 !bg-blue-500 !right-[-5px] !opacity-0 group-hover:!opacity-100 transition-opacity"
+                />
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={col.name}
+                  className="!w-2 !h-2 !bg-blue-500 !left-[-5px] !opacity-0 group-hover:!opacity-100 transition-opacity"
+                />
+              </div>
+              
+              {isExpanded && (
+                <div className="ml-5 mt-1 p-2 bg-slate-900 rounded border border-slate-700 space-y-1">
+                  <div className="text-[10px] text-slate-400 font-semibold mb-1">AGGREGATION</div>
+                  <select
+                    value={aggregation?.function || ''}
+                    onChange={(e) => {
+                      const func = e.target.value as ColumnAggregation['function'];
+                      data.onColumnAggregation(col.name, {
+                        ...aggregation,
+                        function: func,
+                      });
+                    }}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-[10px] text-slate-300"
+                  >
+                    <option value="">None</option>
+                    <option value="COUNT">COUNT</option>
+                    <option value="COUNT_DISTINCT">COUNT DISTINCT</option>
+                    <option value="SUM">SUM</option>
+                    <option value="AVG">AVG</option>
+                    <option value="MIN">MIN</option>
+                    <option value="MAX">MAX</option>
+                  </select>
+                  
+                  {aggregation?.function && (
+                    <>
+                      <div className="text-[10px] text-slate-400 font-semibold mb-1 mt-2">AGGREGATION ALIAS</div>
+                      <input
+                        type="text"
+                        placeholder="e.g., total_count"
+                        value={aggregation?.alias || ''}
+                        onChange={(e) => {
+                          data.onColumnAggregation(col.name, {
+                            ...aggregation,
+                            alias: e.target.value,
+                          });
+                        }}
+                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-[10px] text-slate-300 placeholder-slate-500"
+                      />
+                    </>
+                  )}
+                  
+                  {!aggregation?.function && (
+                    <>
+                      <div className="text-[10px] text-slate-400 font-semibold mb-1 mt-2">COLUMN ALIAS</div>
+                      <input
+                        type="text"
+                        placeholder="e.g., user_name"
+                        value={columnAlias?.alias || ''}
+                        onChange={(e) => {
+                          data.onColumnAlias(col.name, e.target.value);
+                        }}
+                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-[10px] text-slate-300 placeholder-slate-500"
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
