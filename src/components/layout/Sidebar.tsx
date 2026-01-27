@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Database, Terminal, Settings, Table as TableIcon, Loader2, Copy, Hash, PlaySquare, FileText, Plus, ChevronRight, ChevronDown, FileCode, Play, Edit, Trash2, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Database, Terminal, Settings, Table as TableIcon, Loader2, Copy, Hash, PlaySquare, FileText, Plus, ChevronRight, ChevronDown, FileCode, Play, Edit, Trash2, PanelLeftClose, PanelLeft, Key, Columns } from 'lucide-react';
 import clsx from 'clsx';
-import { ask } from '@tauri-apps/plugin-dialog';
+import { ask, message } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { useDatabase } from '../../hooks/useDatabase';
 import { useSavedQueries } from '../../hooks/useSavedQueries';
 import type { SavedQuery } from '../../contexts/SavedQueriesContext';
@@ -10,6 +11,14 @@ import { ContextMenu } from '../ui/ContextMenu';
 import { SchemaModal } from '../ui/SchemaModal';
 import { CreateTableModal } from '../ui/CreateTableModal';
 import { QueryModal } from '../ui/QueryModal';
+
+interface TableColumn {
+  name: string;
+  data_type: string;
+  is_pk: boolean;
+  is_nullable: boolean;
+  is_auto_increment: boolean;
+}
 
 interface AccordionProps {
   title: string;
@@ -59,6 +68,190 @@ const Accordion = ({ title, isOpen, onToggle, children, actions }: AccordionProp
     {isOpen && <div>{children}</div>}
   </div>
 );
+
+const SidebarColumnItem = ({ 
+    column, 
+    tableName,
+    connectionId,
+    driver,
+    onRefresh
+}: { 
+    column: TableColumn; 
+    tableName: string;
+    connectionId: string;
+    driver: string;
+    onRefresh: () => void;
+}) => {
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleDelete = async () => {
+        const confirmed = await ask(
+            `Are you sure you want to delete column "${column.name}" from table "${tableName}"?\n\nWARNING: This will permanently delete all data in this column. This action cannot be undone.`,
+            { title: 'Delete Column', kind: 'warning' }
+        );
+
+        if (confirmed) {
+            try {
+                const q = (driver === 'mysql' || driver === 'mariadb') ? '`' : '"';
+                const query = `ALTER TABLE ${q}${tableName}${q} DROP COLUMN ${q}${column.name}${q}`;
+                
+                await invoke('execute_query', {
+                    connectionId,
+                    query
+                });
+                
+                onRefresh();
+            } catch (e) {
+                console.error(e);
+                await message(`Failed to delete column: ${e}`, { title: 'Error', kind: 'error' });
+            }
+        }
+    };
+
+    return (
+        <>
+            <div 
+                className="flex items-center gap-2 px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200 cursor-pointer group font-mono"
+                onContextMenu={handleContextMenu}
+            >
+                {column.is_pk ? (
+                    <Key size={12} className="text-yellow-500 shrink-0" />
+                ) : (
+                    <Columns size={12} className="text-slate-600 shrink-0" />
+                )}
+                <span className={clsx("truncate", column.is_pk && "font-bold text-yellow-500/80")}>
+                    {column.name}
+                </span>
+                <span className="text-slate-600 text-[10px] ml-auto">
+                    {column.data_type}
+                </span>
+            </div>
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    items={[
+                        {
+                            label: 'Copy Name',
+                            icon: Copy,
+                            action: () => navigator.clipboard.writeText(column.name)
+                        },
+                        {
+                            label: 'Delete Column',
+                            icon: Trash2,
+                            danger: true,
+                            action: handleDelete
+                        }
+                    ]}
+                />
+            )}
+        </>
+    );
+};
+
+const SidebarTableItem = ({ 
+    table, 
+    activeTable, 
+    onTableClick, 
+    onContextMenu,
+    connectionId,
+    driver
+}: { 
+    table: { name: string }; 
+    activeTable: string | null;
+    onTableClick: (name: string) => void;
+    onContextMenu: (e: React.MouseEvent, type: 'table', id: string, label: string) => void;
+    connectionId: string;
+    driver: string;
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [columns, setColumns] = useState<TableColumn[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleExpand = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isExpanded) {
+            setIsExpanded(false);
+            return;
+        }
+
+        setIsExpanded(true);
+        refreshColumns();
+    };
+
+    const refreshColumns = async () => {
+        if (!connectionId) return;
+        setIsLoading(true);
+        try {
+            const cols = await invoke<TableColumn[]>('get_columns', { 
+                connectionId, 
+                tableName: table.name 
+            });
+            setColumns(cols);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col">
+            <div 
+                draggable
+                onDragStart={(e) => {
+                    e.dataTransfer.setData('application/reactflow', table.name);
+                    e.dataTransfer.effectAllowed = 'move';
+                }}
+                onClick={() => onTableClick(table.name)}
+                onContextMenu={(e) => onContextMenu(e, 'table', table.name, table.name)}
+                className={clsx(
+                    "flex items-center gap-1 pl-1 pr-3 py-1.5 text-sm cursor-pointer group select-none transition-colors border-l-2",
+                    activeTable === table.name 
+                    ? "bg-blue-900/40 text-blue-200 border-blue-500" 
+                    : "text-slate-300 hover:bg-slate-800 border-transparent hover:text-white"
+                )}
+            >
+                <button 
+                    onClick={handleExpand}
+                    className="p-0.5 rounded hover:bg-slate-700 text-slate-500 hover:text-white transition-colors"
+                >
+                    {isExpanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+                </button>
+                <TableIcon size={14} className={activeTable === table.name ? "text-blue-400" : "text-slate-500 group-hover:text-blue-400"} />
+                <span className="truncate flex-1">{table.name}</span>
+            </div>
+            {isExpanded && (
+                <div className="ml-[22px] border-l border-slate-800">
+                    {isLoading ? (
+                        <div className="flex items-center gap-2 p-2 text-xs text-slate-500">
+                            <Loader2 size={12} className="animate-spin" />
+                            Loading...
+                        </div>
+                    ) : (
+                        columns.map(col => (
+                            <SidebarColumnItem 
+                                key={col.name} 
+                                column={col} 
+                                tableName={table.name}
+                                connectionId={connectionId}
+                                driver={driver}
+                                onRefresh={refreshColumns}
+                            />
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const Sidebar = () => {
   const { activeConnectionId, activeDriver, activeTable, setActiveTable, tables, isLoadingTables, refreshTables } = useDatabase();
@@ -192,25 +385,15 @@ export const Sidebar = () => {
                     ) : (
                         <div>
                             {tables.map(table => (
-                                <div 
+                                <SidebarTableItem
                                     key={table.name}
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.setData('application/reactflow', table.name);
-                                        e.dataTransfer.effectAllowed = 'move';
-                                    }}
-                                    onClick={() => handleTableClick(table.name)}
-                                    onContextMenu={(e) => handleContextMenu(e, 'table', table.name, table.name)}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer group select-none transition-colors border-l-2",
-                                        activeTable === table.name 
-                                        ? "bg-blue-900/40 text-blue-200 border-blue-500" 
-                                        : "text-slate-300 hover:bg-slate-800 border-transparent hover:text-white"
-                                    )}
-                                >
-                                    <TableIcon size={14} className={activeTable === table.name ? "text-blue-400" : "text-slate-500 group-hover:text-blue-400"} />
-                                    <span className="truncate">{table.name}</span>
-                                </div>
+                                    table={table}
+                                    activeTable={activeTable}
+                                    onTableClick={handleTableClick}
+                                    onContextMenu={handleContextMenu}
+                                    connectionId={activeConnectionId!}
+                                    driver={activeDriver!}
+                                />
                             ))}
                         </div>
                     )}

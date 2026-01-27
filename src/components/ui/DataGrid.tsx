@@ -226,13 +226,9 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
                 key={row.id} 
                 className={`transition-colors group ${isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-800/50'}`}
                 onContextMenu={(e) => handleContextMenu(e, row.original)}
-                onClick={(e) => handleRowClick(rowIndex, e)}
               >
                 <td 
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent double trigger if row click also fires (though here it's fine to just let row handle it, but for clarity let's use the handler directly on the cell if needed, but row click is better)
-                    handleRowClick(rowIndex, e);
-                  }}
+                  onClick={(e) => handleRowClick(rowIndex, e)}
                   className={`px-2 py-1.5 text-xs text-center border-b border-r border-slate-800 sticky left-0 z-10 cursor-pointer select-none w-[50px] min-w-[50px] ${
                     isSelected 
                       ? 'bg-blue-900/40 text-blue-200 font-bold' 
