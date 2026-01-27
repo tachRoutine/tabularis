@@ -1,6 +1,6 @@
 use ssh2::Session;
 use std::collections::HashMap;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::{Child, Command, Stdio};
 use std::sync::OnceLock;
@@ -9,7 +9,7 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 enum TunnelBackend {
@@ -46,14 +46,17 @@ impl SshTunnel {
         );
 
         let local_port = {
-            let listener = TcpListener::bind("127.0.0.1:0")
-                .map_err(|e| format!("Failed to find free local port: {}", e))?;
+            let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| {
+                let err = format!("Failed to find free local port: {}", e);
+                eprintln!("[SSH Tunnel Error] {}", err);
+                err
+            })?;
             listener.local_addr().unwrap().port()
         };
         println!("[SSH Tunnel] Assigned Local Port: {}", local_port);
 
         if use_system_ssh {
-            return Self::new_system_ssh(
+            Self::new_system_ssh(
                 ssh_host,
                 ssh_port,
                 ssh_user,
@@ -61,9 +64,13 @@ impl SshTunnel {
                 remote_host,
                 remote_port,
                 local_port,
-            );
+            )
+            .map_err(|e| {
+                eprintln!("[SSH Tunnel Error] System SSH failed: {}", e);
+                e
+            })
         } else {
-            return Self::new_libssh2(
+            Self::new_libssh2(
                 ssh_host,
                 ssh_port,
                 ssh_user,
@@ -72,7 +79,11 @@ impl SshTunnel {
                 remote_host,
                 remote_port,
                 local_port,
-            );
+            )
+            .map_err(|e| {
+                eprintln!("[SSH Tunnel Error] LibSSH2 failed: {}", e);
+                e
+            })
         }
     }
 
@@ -85,12 +96,18 @@ impl SshTunnel {
         remote_port: u16,
         local_port: u16,
     ) -> Result<Self, String> {
-        let mut args = vec![
-            "-N".to_string(), // No remote command
-            "-L".to_string(),
-            // Explicitly bind to 127.0.0.1 to avoid ambiguity or public binding
-            format!("127.0.0.1:{}:{}:{}", local_port, remote_host, remote_port),
-        ];
+        let mut args = Vec::new();
+
+        #[cfg(debug_assertions)]
+        args.push("-v".to_string()); // Verbose mode only in debug
+
+        args.push("-N".to_string()); // No remote command
+        args.push("-L".to_string());
+        // Explicitly bind to 127.0.0.1 to avoid ambiguity or public binding
+        args.push(format!(
+            "127.0.0.1:{}:{}:{}",
+            local_port, remote_host, remote_port
+        ));
 
         let destination = if !ssh_user.trim().is_empty() {
             format!("{}@{}", ssh_user, ssh_host)
@@ -119,31 +136,104 @@ impl SshTunnel {
 
         let mut child = Command::new("ssh")
             .args(args)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| {
-                format!(
+                let err = format!(
                     "Failed to launch system ssh: {}. Ensure 'ssh' is in PATH.",
                     e
-                )
+                );
+                eprintln!("[SSH Tunnel Error] {}", err);
+                err
             })?;
 
-        thread::sleep(Duration::from_millis(500));
+        let stdout_log = Arc::new(Mutex::new(Vec::new()));
+        let stderr_log = Arc::new(Mutex::new(Vec::new()));
+
+        // Spawn threads to capture and log stdout/stderr in real-time
+        if let Some(stdout) = child.stdout.take() {
+            let log = stdout_log.clone();
+            thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(l) = line {
+                        #[cfg(debug_assertions)]
+                        println!("[SSH System Out] {}", l);
+
+                        if let Ok(mut g) = log.lock() {
+                            g.push(l);
+                        }
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let log = stderr_log.clone();
+            thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(l) = line {
+                        #[cfg(debug_assertions)]
+                        eprintln!("[SSH System Err] {}", l);
+
+                        if let Ok(mut g) = log.lock() {
+                            g.push(l);
+                        }
+                    }
+                }
+            });
+        }
 
         let child_arc = Arc::new(Mutex::new(child));
-        {
-            let mut c = child_arc.lock().unwrap();
-            if let Ok(Some(status)) = c.try_wait() {
-                let mut err_msg = String::new();
-                if let Some(mut stderr) = c.stderr.take() {
-                    stderr.read_to_string(&mut err_msg).ok();
+
+        // Wait for the tunnel to become ready (port listening)
+        let start = Instant::now();
+        let timeout = Duration::from_secs(10);
+        let mut ready = false;
+
+        while start.elapsed() < timeout {
+            // Check if process is still alive
+            {
+                let mut c = child_arc.lock().unwrap();
+                if let Ok(Some(status)) = c.try_wait() {
+                    // Collect captured logs
+                    let stdout_content = stdout_log.lock().unwrap().join("\n");
+                    let stderr_content = stderr_log.lock().unwrap().join("\n");
+
+                    let err_msg = format!(
+                        "SSH process exited prematurely with status: {}.\nStderr: {}\nStdout: {}",
+                        status, stderr_content, stdout_content
+                    );
+                    eprintln!("[SSH Tunnel Error] {}", err_msg);
+                    return Err(err_msg);
                 }
-                return Err(format!(
-                    "SSH tunnel process exited early with status: {}. Error: {}",
-                    status, err_msg
-                ));
             }
+
+            // Try connecting to the local port to see if forwarding is active
+            match TcpStream::connect(format!("127.0.0.1:{}", local_port)) {
+                Ok(_) => {
+                    println!(
+                        "[SSH Tunnel] Tunnel established successfully on port {}",
+                        local_port
+                    );
+                    ready = true;
+                    break;
+                }
+                Err(_) => {
+                    // Not ready yet, wait a bit
+                    thread::sleep(Duration::from_millis(100));
+                }
+            }
+        }
+
+        if !ready {
+            // If we timed out, kill the process
+            if let Ok(mut c) = child_arc.lock() {
+                let _ = c.kill();
+            }
+            return Err("Timed out waiting for SSH tunnel to establish connection.".to_string());
         }
 
         Ok(Self {
@@ -166,44 +256,74 @@ impl SshTunnel {
             "[SSH Tunnel] LibSsh2 connecting to {}:{}",
             ssh_host, ssh_port
         );
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port))
-            .map_err(|e| format!("Failed to bind local port {}: {}", local_port, e))?;
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).map_err(|e| {
+            let err = format!("Failed to bind local port {}: {}", local_port, e);
+            eprintln!("[SSH Tunnel Error] {}", err);
+            err
+        })?;
 
-        let tcp = TcpStream::connect(format!("{}:{}", ssh_host, ssh_port))
-            .map_err(|e| format!("Failed to connect to SSH server: {}", e))?;
+        let tcp = TcpStream::connect(format!("{}:{}", ssh_host, ssh_port)).map_err(|e| {
+            let err = format!("Failed to connect to SSH server: {}", e);
+            eprintln!("[SSH Tunnel Error] {}", err);
+            err
+        })?;
 
         let mut sess = Session::new().unwrap();
         sess.set_tcp_stream(tcp);
-        sess.handshake()
-            .map_err(|e| format!("SSH handshake failed: {}", e))?;
+        sess.handshake().map_err(|e| {
+            let err = format!("SSH handshake failed: {}", e);
+            eprintln!("[SSH Tunnel Error] {}", err);
+            err
+        })?;
 
         if let Some(key_path) = ssh_key_file {
             if !key_path.trim().is_empty() {
+                println!("[SSH Tunnel] Authenticating with key file: {}", key_path);
                 sess.userauth_pubkey_file(
                     ssh_user,
                     None,
                     std::path::Path::new(key_path),
                     ssh_password,
                 )
-                .map_err(|e| format!("SSH key auth failed: {}", e))?;
+                .map_err(|e| {
+                    let err = format!("SSH key auth failed: {}", e);
+                    eprintln!("[SSH Tunnel Error] {}", err);
+                    err
+                })?;
             } else {
                 if let Some(pwd) = ssh_password {
-                    sess.userauth_password(ssh_user, pwd)
-                        .map_err(|e| format!("SSH password auth failed: {}", e))?;
+                    println!("[SSH Tunnel] Authenticating with password");
+                    sess.userauth_password(ssh_user, pwd).map_err(|e| {
+                        let err = format!("SSH password auth failed: {}", e);
+                        eprintln!("[SSH Tunnel Error] {}", err);
+                        err
+                    })?;
                 } else {
-                    return Err("No SSH credentials provided".to_string());
+                    let err = "No SSH credentials provided".to_string();
+                    eprintln!("[SSH Tunnel Error] {}", err);
+                    return Err(err);
                 }
             }
         } else if let Some(pwd) = ssh_password {
-            sess.userauth_password(ssh_user, pwd)
-                .map_err(|e| format!("SSH password auth failed: {}", e))?;
+            println!("[SSH Tunnel] Authenticating with password");
+            sess.userauth_password(ssh_user, pwd).map_err(|e| {
+                let err = format!("SSH password auth failed: {}", e);
+                eprintln!("[SSH Tunnel Error] {}", err);
+                err
+            })?;
         } else {
-            sess.userauth_agent(ssh_user)
-                .map_err(|e| format!("SSH agent auth failed: {}", e))?;
+            println!("[SSH Tunnel] Authenticating with SSH agent");
+            sess.userauth_agent(ssh_user).map_err(|e| {
+                let err = format!("SSH agent auth failed: {}", e);
+                eprintln!("[SSH Tunnel Error] {}", err);
+                err
+            })?;
         }
 
         if !sess.authenticated() {
-            return Err("SSH authentication failed".to_string());
+            let err = "SSH authentication failed".to_string();
+            eprintln!("[SSH Tunnel Error] {}", err);
+            return Err(err);
         }
 
         sess.set_timeout(10);
@@ -227,7 +347,7 @@ impl SshTunnel {
                         let running_inner = running_clone.clone();
 
                         thread::spawn(move || {
-                            let mut sess_lock = match sess.lock() {
+                            let sess_lock = match sess.lock() {
                                 Ok(l) => l,
                                 Err(_) => return,
                             };

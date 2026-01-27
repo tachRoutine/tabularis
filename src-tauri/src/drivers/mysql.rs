@@ -1,4 +1,3 @@
-use sqlx::mysql::MySqlRow;
 use sqlx::{Column, Connection, Row};
 use urlencoding::encode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};

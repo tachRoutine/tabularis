@@ -4,7 +4,7 @@ use std::str::FromStr;
 use tauri::{AppHandle, Manager, Runtime, State};
 use uuid::Uuid;
 use sqlx::any::AnyConnectOptions;
-use sqlx::{Connection, ConnectOptions, AnyConnection};
+use sqlx::{Connection, AnyConnection};
 use urlencoding::encode;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -53,7 +53,10 @@ fn resolve_connection_params(params: &ConnectionParams) -> Result<ConnectionPara
             params.ssh_password.as_deref(), 
             params.ssh_key_file.as_deref(),
             remote_host, remote_port
-        )?;
+        ).map_err(|e| {
+            eprintln!("[Connection Error] SSH Tunnel setup failed: {}", e);
+            e
+        })?;
         
         let local_port = tunnel.local_port;
         

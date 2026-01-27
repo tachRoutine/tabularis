@@ -1,4 +1,3 @@
-use sqlx::sqlite::SqliteRow;
 use sqlx::{Column, Connection, Row};
 use crate::models::{ConnectionParams, TableInfo, TableColumn, QueryResult, Pagination};
 

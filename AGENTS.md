@@ -121,10 +121,12 @@
             - Implemented "Save/Edit Query" Modal with Monaco Editor integration.
             - **Dropdown Polish:** Added "Save" button (floppy icon) next to each query in the "Run" dropdown list for quick saving.
 
-### Session 13: Release Automation & Version Bump
-- **Status:** Beta Release Ready.
+### Session 14: SSH Tunnel Debugging
+- **Status:** Maintenance / Debugging.
 - **Actions:**
-    - **Versioning:** Bumped version to `0.2.0` in `package.json`, `tauri.conf.json`, `Cargo.toml`.
-    - **Docs:** Updated `README.md` with new features and roadmap.
-    - **CI/CD:** Created `.github/workflows/release.yml` to automatically build and release binaries on tag push.
-    - **Fixes:** Added `libfuse2` to CI dependencies to resolve AppImage build issues on Ubuntu 22.04+.
+    - **Backend:**
+        - **Enhanced Logging:** Added comprehensive error logging to `SshTunnel` implementation (`src-tauri/src/ssh_tunnel.rs`).
+        - **Conditional Verbosity:** SSH verbose mode (`-v`) and real-time stream logging are now enabled **only in debug builds** (`#[cfg(debug_assertions)]`), ensuring a clean console for release builds.
+        - **Error Capture:** Implemented rigorous stdout/stderr capture for system SSH process failures to surface actual errors (e.g., "Permission denied") to the user.
+        - **Wait-for-Ready:** Fixed "first connection failure" by implementing an active wait loop (up to 10s) that verifies the local tunnel port is listening before returning success.
+        - **Monitor Process:** Added logic to detect premature SSH process exit during tunnel initialization and return the captured error log immediately.
