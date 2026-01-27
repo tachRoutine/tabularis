@@ -12,9 +12,7 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 ## Release Download:
 
 <!-- DOWNLOAD_SECTION_START -->
-
 [![Windows](https://img.shields.io/badge/Windows-Download-blue?logo=windows)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_x64-setup.exe) [![macOS](https://img.shields.io/badge/macOS-Download-black?logo=apple)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_x64.dmg) [![Linux](https://img.shields.io/badge/Linux-Download-green?logo=linux)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_amd64.AppImage)
-
 <!-- DOWNLOAD_SECTION_END -->
 
 <div align="center">
