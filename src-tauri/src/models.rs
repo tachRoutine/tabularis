@@ -38,6 +38,13 @@ pub struct TableColumn {
     pub is_auto_increment: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Pagination {
+    pub page: u32,
+    pub page_size: u32,
+    pub total_rows: u64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct QueryResult {
     pub columns: Vec<String>,
@@ -45,4 +52,5 @@ pub struct QueryResult {
     pub affected_rows: u64,
     #[serde(default)]
     pub truncated: bool,
+    pub pagination: Option<Pagination>,
 }

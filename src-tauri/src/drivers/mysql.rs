@@ -2,7 +2,7 @@ use sqlx::mysql::MySqlRow;
 use sqlx::{Column, Connection, Row};
 use urlencoding::encode;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use crate::models::{ConnectionParams, TableInfo, TableColumn, QueryResult};
+use crate::models::{ConnectionParams, TableInfo, TableColumn, QueryResult, Pagination};
 
 pub async fn get_tables(params: &ConnectionParams) -> Result<Vec<TableInfo>, String> {
     let user = encode(params.username.as_deref().unwrap_or_default());
@@ -140,7 +140,7 @@ pub async fn insert_record(params: &ConnectionParams, table: &str, data: std::co
     Ok(result.rows_affected())
 }
 
-pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option<u32>) -> Result<QueryResult, String> {
+pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option<u32>, page: u32) -> Result<QueryResult, String> {
     let user = encode(params.username.as_deref().unwrap_or_default());
     let pass = encode(params.password.as_deref().unwrap_or_default());
     let url = format!("mysql://{}:{}@{}:{}/{}", 
@@ -149,8 +149,41 @@ pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option
     
     let mut conn = sqlx::mysql::MySqlConnection::connect(&url).await.map_err(|e| e.to_string())?;
     
+    let is_select = query.trim_start().to_uppercase().starts_with("SELECT");
+    let mut pagination: Option<Pagination> = None;
+    let final_query: String;
+    let mut manual_limit = limit;
+
+    if is_select && limit.is_some() {
+        let l = limit.unwrap();
+        let offset = (page - 1) * l;
+        
+        // Count total rows
+        let count_q = format!("SELECT COUNT(*) FROM ({}) as count_wrapper", query);
+        // We use fetch_one directly
+        let count_res = sqlx::query(&count_q).fetch_one(&mut conn).await;
+        
+        let total_rows: u64 = if let Ok(row) = count_res {
+            row.try_get::<i64, _>(0).unwrap_or(0) as u64
+        } else {
+            0
+        };
+
+        pagination = Some(Pagination {
+            page,
+            page_size: l,
+            total_rows,
+        });
+
+        // Wrap query for pagination
+        final_query = format!("SELECT * FROM ({}) as data_wrapper LIMIT {} OFFSET {}", query, l, offset);
+        manual_limit = None; // Disable manual limit since SQL handles it
+    } else {
+        final_query = query.to_string();
+    }
+    
     // Use fetch instead of fetch_all to support streaming/limit
-    let mut rows_stream = sqlx::query(query).fetch(&mut conn);
+    let mut rows_stream = sqlx::query(&final_query).fetch(&mut conn);
     
     let mut columns: Vec<String> = Vec::new();
     let mut json_rows = Vec::new();
@@ -166,8 +199,8 @@ pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option
                     columns = row.columns().iter().map(|c| c.name().to_string()).collect();
                 }
 
-                // Check limit
-                if let Some(l) = limit {
+                // Check limit (only if manual_limit is set)
+                if let Some(l) = manual_limit {
                     if json_rows.len() >= l as usize {
                         truncated = true;
                         break;
@@ -202,5 +235,5 @@ pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option
         }
     }
     
-    Ok(QueryResult { columns, rows: json_rows, affected_rows: 0, truncated })
+    Ok(QueryResult { columns, rows: json_rows, affected_rows: 0, truncated, pagination })
 }

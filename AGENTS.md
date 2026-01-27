@@ -81,3 +81,14 @@
         - Added **Info** tab with GitHub star button.
         - **Sidebar:** Hidden Explorer sidebar when in Settings view.
     - **Editor:** Updated to send `limit` parameter and display a "Truncated" warning badge when results are limited.
+
+### Session 10: Pagination
+- **Status:** Feature Complete.
+- **Actions:**
+    - **Backend Pagination:** Implemented real SQL pagination (`LIMIT` + `OFFSET`) for `SELECT` queries across all drivers.
+    - **Count Query:** Added logic to automatically count total rows for paginated queries using a wrapped `SELECT COUNT(*)`.
+    - **Frontend:**
+        - Added pagination controls (First, Prev, Next, Last) to the query results footer.
+        - Display "Showing X - Y of Z" and total rows count.
+        - **Jump to Page:** Implemented clickable page number that turns into an input field for quick navigation to a specific page.
+        - Integrated pagination state with `execute_query` calls.

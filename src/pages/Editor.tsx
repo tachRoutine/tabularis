@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Play, Loader2, Plus, Download } from 'lucide-react';
+import { Play, Loader2, Plus, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useDatabase } from '../contexts/DatabaseContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -10,11 +10,18 @@ import MonacoEditor, { type OnMount } from '@monaco-editor/react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 
+interface Pagination {
+  page: number;
+  page_size: number;
+  total_rows: number;
+}
+
 interface QueryResult {
   columns: string[];
   rows: any[][];
   affected_rows: number;
   truncated?: boolean;
+  pagination?: Pagination;
 }
 
 interface TableColumn {
@@ -32,6 +39,9 @@ export const Editor = () => {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [isEditingPage, setIsEditingPage] = useState(false);
+  const [tempPage, setTempPage] = useState("1");
   
   // Context info for editing/deleting
   const [activeTable, setActiveTable] = useState<string | null>(null);
@@ -51,7 +61,7 @@ export const Editor = () => {
       
       console.log('Auto-running query:', sql);
       setQuery(sql);
-      runQuery(sql);
+      runQuery(sql, 1);
       
       if (table) {
         setActiveTable(table);
@@ -77,7 +87,7 @@ export const Editor = () => {
     }
   };
 
-  const runQuery = async (sql: string = query) => {
+  const runQuery = async (sql: string = query, pageNum: number = 1) => {
     if (!activeConnectionId) {
       setError('No active connection selected.');
       return;
@@ -86,7 +96,10 @@ export const Editor = () => {
     
     setIsLoading(true);
     setError('');
-    setResult(null);
+    // Don't clear result immediately to prevent flickering during page change? 
+    // Maybe better UX to clear or show loading overlay. Let's clear for now.
+    setResult(null); 
+    setPage(pageNum);
 
     // If user runs a custom query, we might lose context of "Active Table" unless we parse SQL.
     // For safety, if query changed from initial, clear active table context unless we are sure.
@@ -98,11 +111,12 @@ export const Editor = () => {
     }
 
     try {
-      console.log('Executing:', sql);
+      console.log('Executing:', sql, 'Page:', pageNum);
       const res = await invoke<QueryResult>('execute_query', {
         connectionId: activeConnectionId,
         query: sql,
-        limit: settings.queryLimit > 0 ? settings.queryLimit : null
+        limit: settings.queryLimit > 0 ? settings.queryLimit : null,
+        page: pageNum
       });
       console.log('Result:', res);
       setResult(res);
@@ -118,13 +132,13 @@ export const Editor = () => {
       if (activeTable && activeConnectionId) {
           // Re-run the last query (assuming it was select *)
           // Or re-run current query text
-          runQuery(query);
+          runQuery(query, page);
       }
   };
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      runQuery(editor.getValue());
+      runQuery(editor.getValue(), 1); // Reset to page 1 on manual run
     });
   };
 
@@ -216,7 +230,7 @@ export const Editor = () => {
       {/* Toolbar */}
       <div className="flex items-center p-2 border-b border-slate-800 bg-slate-900 gap-2 h-[50px]">
         <button
-          onClick={() => runQuery()}
+          onClick={() => runQuery(query, 1)}
           disabled={isLoading || !activeConnectionId}
           className="flex items-center gap-2 px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Run Query (Ctrl+Enter)"
@@ -313,15 +327,97 @@ export const Editor = () => {
           </div>
         ) : result ? (
           <div className="flex-1 min-h-0 flex flex-col">
-             <div className="p-2 bg-slate-900 text-xs text-slate-400 border-b border-slate-800 flex justify-between shrink-0">
-               <div className="flex items-center gap-2">
+             <div className="p-2 bg-slate-900 text-xs text-slate-400 border-b border-slate-800 flex justify-between items-center shrink-0">
+               <div className="flex items-center gap-4">
                  <span>{result.rows.length} rows retrieved</span>
-                 {result.truncated && (
+                 {result.truncated && !result.pagination && (
                    <span className="text-yellow-500 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-900/50">
                      Truncated (Limit: {settings.queryLimit})
                    </span>
                  )}
                </div>
+
+               {/* Pagination Controls */}
+               {result.pagination && result.pagination.total_rows > 0 && (
+                 <div className="flex items-center gap-2">
+                    <span className="mr-2">
+                      {((result.pagination.page - 1) * result.pagination.page_size) + 1} - {Math.min(result.pagination.page * result.pagination.page_size, result.pagination.total_rows)} of {result.pagination.total_rows}
+                    </span>
+                    
+                    <div className="flex items-center bg-slate-800 rounded border border-slate-700">
+                      <button 
+                        disabled={result.pagination.page <= 1 || isLoading}
+                        onClick={() => runQuery(query, 1)}
+                        className="p-1 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="First Page"
+                      >
+                        <ChevronsLeft size={14} />
+                      </button>
+                      <button 
+                        disabled={result.pagination.page <= 1 || isLoading}
+                        onClick={() => runQuery(query, result.pagination!.page - 1)}
+                        className="p-1 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border-l border-slate-700"
+                        title="Previous Page"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      
+                      <div 
+                        className="px-2 py-0.5 text-slate-300 font-mono border-l border-slate-700 min-w-[40px] text-center cursor-pointer hover:bg-slate-700 hover:text-white relative"
+                        onClick={() => {
+                          if (!isEditingPage) {
+                            setIsEditingPage(true);
+                            setTempPage(result.pagination!.page.toString());
+                          }
+                        }}
+                      >
+                        {isEditingPage ? (
+                          <input 
+                            autoFocus
+                            type="text"
+                            className="w-full bg-transparent text-center focus:outline-none text-white p-0 m-0 border-none h-full"
+                            value={tempPage}
+                            onChange={(e) => setTempPage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const newPage = parseInt(tempPage);
+                                const maxPage = Math.ceil(result.pagination!.total_rows / result.pagination!.page_size);
+                                if (!isNaN(newPage) && newPage >= 1 && newPage <= maxPage) {
+                                   runQuery(query, newPage);
+                                }
+                                setIsEditingPage(false);
+                              } else if (e.key === 'Escape') {
+                                setIsEditingPage(false);
+                              }
+                              e.stopPropagation();
+                            }}
+                            onBlur={() => setIsEditingPage(false)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          result.pagination.page
+                        )}
+                      </div>
+
+                      <button 
+                        disabled={result.pagination.page * result.pagination.page_size >= result.pagination.total_rows || isLoading}
+                        onClick={() => runQuery(query, result.pagination!.page + 1)}
+                        className="p-1 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border-l border-slate-700"
+                        title="Next Page"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                      <button 
+                        disabled={result.pagination.page * result.pagination.page_size >= result.pagination.total_rows || isLoading}
+                        onClick={() => runQuery(query, Math.ceil(result.pagination!.total_rows / result.pagination!.page_size))}
+                        className="p-1 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border-l border-slate-700"
+                        title="Last Page"
+                      >
+                        <ChevronsRight size={14} />
+                      </button>
+                    </div>
+                 </div>
+               )}
              </div>
              <div className="flex-1 min-h-0 overflow-hidden">
                <DataGrid 
