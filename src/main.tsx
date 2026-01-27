@@ -5,13 +5,16 @@ import './index.css';
 import { DatabaseProvider } from './contexts/DatabaseProvider';
 import { SettingsProvider } from './contexts/SettingsProvider';
 import { SavedQueriesProvider } from './contexts/SavedQueriesProvider';
+import { EditorProvider } from './contexts/EditorProvider';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <SettingsProvider>
       <DatabaseProvider>
         <SavedQueriesProvider>
-          <App />
+          <EditorProvider>
+            <App />
+          </EditorProvider>
         </SavedQueriesProvider>
       </DatabaseProvider>
     </SettingsProvider>

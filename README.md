@@ -57,6 +57,7 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 ### 📝 SQL Editor
 
 - **Monaco Editor:** Industry-standard editor with syntax highlighting.
+- **Multiple Tabs:** DataGrip-style tab management with connection isolation.
 - **Execution:** Run queries with `Ctrl+Enter` or Run button.
 - **Partial Execution:** Select specific text to run only that portion.
 - **Query History:** (Saved Queries feature covers this usage).
@@ -120,8 +121,8 @@ npm run tauri build
 - [x] Data Export (CSV/JSON)
 - [x] Saved Queries & Persistence
 - [x] Pagination & Result Limiting
+- [x] Multiple Tabs support
 - [ ] Visual Query Builder
-- [ ] Multiple Tabs support
 
 ## License
 

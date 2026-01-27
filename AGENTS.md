@@ -56,10 +56,6 @@ Adhere to the rules defined in the [rules directory](./.rules/):
     - **SSH Tunnel:** Added data structures and UI to configure SSH tunneling for connections.
     - **Docs:** Updated README with "vibe coding" origin story.
 
-- **Next Steps:**
-    - Implement actual SSH tunneling logic in Rust backend.
-    - Multiple Query Tabs.
-
 ### Session 7: Error Handling & Robustness
 - **Status:** In Progress.
 - **Actions:**
@@ -170,3 +166,24 @@ Adhere to the rules defined in the [rules directory](./.rules/):
         - Added "Clone" button to connection cards which immediately opens the Edit modal for the new copy.
         - **Dialog Fix:** Replaced all native `confirm()` and `alert()` calls with `@tauri-apps/plugin-dialog` counterparts (`ask`, `message`) to resolve issues with native dialogs not appearing.
     - **Release:** Bumped version to **0.3.0**.
+
+### Session 18: Multiple Query Tabs (DataGrip Style)
+- **Status:** Feature Complete.
+- **Actions:**
+    - **State Management:**
+        - Created `EditorProvider` and `EditorContext` for global tab management.
+        - Implemented **Connection Isolation**: Tabs and active sessions are stored per-connection.
+        - Tabs are persistent using `localStorage`.
+    - **DataGrip Logic:**
+        - Implemented **Typed Tabs**: `console` (SQL script) and `table` (data view).
+        - **Smart Re-use**: Clicking a table in the sidebar focuses the existing tab instead of duplicating it.
+        - **Auto-execution**: Tabs opened from sidebar (tables/queries) execute automatically.
+    - **UI Redesign:**
+        - Compact tab bar with icons, active indicators, and "close on hover" behavior.
+        - Added "+" button to quickly spawn new consoles.
+        - Visual execution progress bar per tab.
+    - **Robustness:** Fixed infinite re-render loops using `useRef` locks and `useCallback` memoization.
+
+- **Next Steps:**
+    - Multi-statement execution (running all queries in a tab).
+    - Database export/dump.
