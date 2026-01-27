@@ -119,8 +119,8 @@ export const Sidebar = () => {
         </div>
       </aside>
 
-      {/* Secondary Sidebar (Schema Explorer) - Only visible when connected and not in settings */}
-      {activeConnectionId && location.pathname !== '/settings' && (
+      {/* Secondary Sidebar (Schema Explorer) - Only visible when connected and not in settings or home */}
+      {activeConnectionId && location.pathname !== '/settings' && location.pathname !== '/' && (
         <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col">
           <div className="p-4 border-b border-slate-800 font-semibold text-sm text-slate-200 flex items-center gap-2">
             <Database size={16} className="text-blue-400"/>
