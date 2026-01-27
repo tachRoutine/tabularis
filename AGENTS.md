@@ -138,3 +138,26 @@ Adhere to the rules defined in the [rules directory](./.rules/):
 - **Actions:**
     - **Rules:** Created `.rules/` directory and defined `typescript.md` and `react.md` to prevent common linting/runtime errors (Any types, Hook deps, Sync setState, Fast Refresh).
     - **Docs:** Updated `AGENTS.md` to link and enforce these new rules.
+
+### Session 16: Driver Refactoring & Type Compatibility
+- **Status:** Refactoring Complete / Bug Fix.
+- **Actions:**
+    - **Backend Refactoring:**
+        - **Created Common Module:** Added `src-tauri/src/drivers/common.rs` with shared utilities and type extraction macros.
+        - **Database-Specific Macros:** Implemented three specialized macros:
+            - `try_extract_mysql_value!()` - Full support for unsigned integers, UUID, TIMESTAMP/DATETIME
+            - `try_extract_postgres_value!()` - Support for TIMESTAMPTZ, UUID, JSON/JSONB, no unsigned types
+            - `try_extract_sqlite_value!()` - Flexible type handling with string-first approach
+        - **Type Priority Fix:** Reordered type checks to prioritize DateTime types BEFORE integers to fix TIMESTAMP recognition
+        - **Eliminated Redundancy:** Reduced ~500 lines of duplicate type mapping code across drivers to ~230 lines of reusable macros
+    - **Type Support Enhancement:**
+        - **All Databases:** Added support for UUID, Vec<u8> (base64 encoded), all integer sizes (i8-i64, u8-u64 where supported)
+        - **MySQL:** NaiveDateTime, NaiveDate, NaiveTime recognition improved
+        - **PostgreSQL:** DateTime<Utc>, JSON/JSONB native support
+        - **SQLite:** String-first approach for flexible date handling
+    - **Bug Fixes:**
+        - **Fixed TIMESTAMP NULL Issue:** Corrected if-else chain continuity in macros (removed standalone blocks that broke the cascade)
+        - **Fixed Truncated Badge:** Updated frontend logic to show "Paginated" badge when pagination is active
+    - **Dependencies:**
+        - Added `uuid` feature to sqlx in `Cargo.toml`
+        - Ensured base64 encoding support for binary data

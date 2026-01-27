@@ -1,5 +1,6 @@
 use sqlx::{Column, Connection, Row};
 use crate::models::{ConnectionParams, TableInfo, TableColumn, QueryResult, Pagination};
+use crate::drivers::common::extract_sqlite_value;
 
 pub async fn get_tables(params: &ConnectionParams) -> Result<Vec<TableInfo>, String> {
     let url = format!("sqlite://{}", params.database);
@@ -175,20 +176,7 @@ pub async fn execute_query(params: &ConnectionParams, query: &str, limit: Option
 
                 let mut json_row = Vec::new();
                 for (i, _) in row.columns().iter().enumerate() {
-                    // SQLite is flexible
-                    let val = if let Ok(v) = row.try_get::<i64, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<i32, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<i16, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<i8, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<u64, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<u32, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<u16, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<u8, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<f64, _>(i) { serde_json::Number::from_f64(v).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null) }
-                    else if let Ok(v) = row.try_get::<f32, _>(i) { serde_json::Number::from_f64(v as f64).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null) }
-                    else if let Ok(v) = row.try_get::<String, _>(i) { serde_json::Value::from(v) }
-                    else if let Ok(v) = row.try_get::<bool, _>(i) { serde_json::Value::from(v) }
-                    else { serde_json::Value::Null };
+                    let val = extract_sqlite_value(&row, i);
                     json_row.push(val);
                 }
                 json_rows.push(json_row);

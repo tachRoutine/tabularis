@@ -3,6 +3,7 @@ pub mod ssh_tunnel;
 pub mod saved_queries;
 pub mod models;
 pub mod drivers {
+    pub mod common;
     pub mod mysql;
     pub mod postgres;
     pub mod sqlite;

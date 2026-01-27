@@ -582,9 +582,12 @@ export const Editor = () => {
                     </span>
                   )}
                 </span>
-                {result.truncated && (
+                {(result.truncated ||
+                  (result.pagination &&
+                    result.pagination.total_rows >
+                      result.pagination.page_size)) && (
                   <span className="text-yellow-500 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-900/50">
-                    Truncated (Limit: {settings.queryLimit})
+                    Paginated (Limit: {settings.queryLimit})
                   </span>
                 )}
               </div>
