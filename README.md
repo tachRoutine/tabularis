@@ -7,6 +7,8 @@
 
 A lightweight, developer-focused database management tool, built with Tauri and React.
 
+> 💡 **Origin Story:** This project was born from a **vibe coding** session — an experiment in fluid, agent-assisted development to build a functional tool from scratch in record time.
+
 ## Release Download:
 
 <!-- DOWNLOAD_SECTION_START -->
@@ -14,8 +16,6 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 [![Windows](https://img.shields.io/badge/Windows-Download-blue?logo=windows)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_x64-setup.exe) [![macOS](https://img.shields.io/badge/macOS-Download-black?logo=apple)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_x64.dmg) [![Linux](https://img.shields.io/badge/Linux-Download-green?logo=linux)](https://github.com/debba/debba.sql/releases/download/v0.3.0/debba.sql_0.3.0_amd64.AppImage)
 
 <!-- DOWNLOAD_SECTION_END -->
-
-> 💡 **Origin Story:** This project was born from a **vibe coding** session — an experiment in fluid, agent-assisted development to build a functional tool from scratch in record time.
 
 <div align="center">
   <img src="screenshots/overview.png" width="80%" alt="Main Window" />
