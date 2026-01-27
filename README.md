@@ -21,25 +21,14 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 
 ## Features
 
-### 🚀 New in v0.2.0 (Beta)
+### 🚀 New in v0.3.0
 
-- **Advanced SQL Execution:**
-  - **Stop Queries:** Cancel long-running queries instantly.
-  - **Run Selection:** Execute only highlighted SQL code.
-  - **Smart Run:** Executes single query or prompts selection if multiple queries are detected.
-  - **Query List:** Quick dropdown to view and execute any query in the editor.
-- **Saved Queries:**
-  - Save frequently used queries with custom names.
-  - Manage via Sidebar context menu (Execute, Edit, Delete).
-  - Saved queries are persisted as `.sql` files for portability.
-- **Result Pagination:**
-  - Server-side pagination (`LIMIT`/`OFFSET`) for efficiency.
-  - Configurable page size (default 500).
-  - "Jump to Page" navigation.
-- **UI Polish:**
-  - Dynamic window title shows active database.
-  - Sidebar accordion layout for Saved Queries and Tables.
-  - Settings page with configuration tabs.
+- **Connection Management:**
+  - **Clone Connections:** Duplicate connection profiles with a single click.
+  - **Dialog Fix:** Replaced native dialogs with Tauri plugin dialogs for better compatibility.
+- **Backend Improvements:**
+  - Implemented `duplicate_connection` command for profile cloning.
+- **Release:** Bumped to version 0.3.0.
 
 ### 🔌 Connection Management
 
