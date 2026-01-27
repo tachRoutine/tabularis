@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { useDatabase } from '../../contexts/DatabaseContext';
+import { useDatabase } from '../../hooks/useDatabase';
 
 interface TableColumn {
   name: string;
@@ -15,14 +15,14 @@ interface EditRowModalProps {
   onClose: () => void;
   tableName: string;
   pkColumn: string;
-  rowData: any[];
+  rowData: unknown[];
   columns: string[];
   onSaveSuccess: () => void;
 }
 
 export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, columns, onSaveSuccess }: EditRowModalProps) => {
   const { activeConnectionId } = useDatabase();
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [tableSchema, setTableSchema] = useState<TableColumn[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +42,7 @@ export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, co
   // Initialize form data from rowData
   useEffect(() => {
     if (isOpen && rowData && columns) {
-      const initialData: Record<string, any> = {};
+      const initialData: Record<string, unknown> = {};
       columns.forEach((col, index) => {
         initialData[col] = rowData[index];
       });
@@ -52,7 +52,7 @@ export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, co
 
   if (!isOpen) return null;
 
-  const parseValue = (value: any, colName: string) => {
+  const parseValue = (value: unknown, colName: string) => {
     // Find column definition
     const colDef = tableSchema.find(c => c.name === colName);
     if (!colDef) return value; // Fallback
@@ -124,9 +124,9 @@ export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, co
 
       onSaveSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Update failed:', err);
-      setError('Failed to update row: ' + err);
+      setError('Failed to update row: ' + String(err));
     } finally {
       setLoading(false);
     }

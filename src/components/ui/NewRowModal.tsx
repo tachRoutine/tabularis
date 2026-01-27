@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { useDatabase } from '../../contexts/DatabaseContext';
+import { useDatabase } from '../../hooks/useDatabase';
 
 interface TableColumn {
   name: string;
@@ -21,7 +21,7 @@ interface NewRowModalProps {
 export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRowModalProps) => {
   const { activeConnectionId } = useDatabase();
   const [columns, setColumns] = useState<TableColumn[]>([]);
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,7 +36,7 @@ export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRo
       .then(cols => {
         setColumns(cols);
         // Initialize form data (empty)
-        const initialData: Record<string, any> = {};
+        const initialData: Record<string, unknown> = {};
         cols.forEach(col => {
             initialData[col.name] = ''; // Default empty string for text inputs
         });
@@ -78,7 +78,7 @@ export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRo
     setError('');
 
     try {
-      const dataToSend: Record<string, any> = {};
+      const dataToSend: Record<string, unknown> = {};
       
       for (const col of columns) {
           const rawVal = formData[col.name];
@@ -92,7 +92,7 @@ export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRo
               dataToSend[col.name] = null;
           } else if (rawVal !== '') {
               // Parse value based on type
-              dataToSend[col.name] = parseValue(rawVal, col.data_type);
+              dataToSend[col.name] = parseValue(String(rawVal), col.data_type);
           }
       }
 
@@ -104,9 +104,9 @@ export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRo
 
       onSaveSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Insert failed:', err);
-      setError('Failed to insert row: ' + err);
+      setError('Failed to insert row: ' + String(err));
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ export const NewRowModal = ({ isOpen, onClose, tableName, onSaveSuccess }: NewRo
                       {col.is_auto_increment && <span className="text-blue-400 text-[10px] uppercase">Auto</span>}
                     </label>
                     <input
-                      value={formData[col.name] || ''}
+                      value={String(formData[col.name] ?? '')}
                       onChange={(e) => handleInputChange(col.name, e.target.value)}
                       placeholder={col.is_auto_increment ? '(Auto-generated)' : col.is_nullable ? 'NULL' : 'Required'}
                       className={`

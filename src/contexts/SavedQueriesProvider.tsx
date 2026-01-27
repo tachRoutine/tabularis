@@ -1,31 +1,14 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useDatabase } from './DatabaseContext';
-
-export interface SavedQuery {
-  id: string;
-  name: string;
-  sql: string;
-  connection_id: string;
-}
-
-interface SavedQueriesContextType {
-  queries: SavedQuery[];
-  isLoading: boolean;
-  saveQuery: (name: string, sql: string) => Promise<void>;
-  updateQuery: (id: string, name: string, sql: string) => Promise<void>;
-  deleteQuery: (id: string) => Promise<void>;
-  refreshQueries: () => Promise<void>;
-}
-
-const SavedQueriesContext = createContext<SavedQueriesContextType | undefined>(undefined);
+import { useDatabase } from '../hooks/useDatabase';
+import { SavedQueriesContext, type SavedQuery } from './SavedQueriesContext';
 
 export const SavedQueriesProvider = ({ children }: { children: ReactNode }) => {
   const { activeConnectionId } = useDatabase();
   const [queries, setQueries] = useState<SavedQuery[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const refreshQueries = async () => {
+  const refreshQueries = useCallback(async () => {
     if (!activeConnectionId) {
         setQueries([]);
         return;
@@ -40,11 +23,11 @@ export const SavedQueriesProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeConnectionId]);
 
   useEffect(() => {
     refreshQueries();
-  }, [activeConnectionId]);
+  }, [refreshQueries]);
 
   const saveQuery = async (name: string, sql: string) => {
     if (!activeConnectionId) return;
@@ -82,12 +65,4 @@ export const SavedQueriesProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </SavedQueriesContext.Provider>
   );
-};
-
-export const useSavedQueries = () => {
-  const context = useContext(SavedQueriesContext);
-  if (context === undefined) {
-    throw new Error('useSavedQueries must be used within a SavedQueriesProvider');
-  }
-  return context;
 };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Github, CheckCircle2, Circle, Heart, Info, Code2, Settings as SettingsIcon } from 'lucide-react';
 import clsx from 'clsx';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../hooks/useSettings';
 
 export const Settings = () => {
   const { settings, updateSetting } = useSettings();

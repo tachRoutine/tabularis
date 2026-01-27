@@ -1,35 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-
-interface TableInfo {
-  name: string;
-}
-
-interface SavedConnection {
-  id: string;
-  name: string;
-  params: {
-    driver: string;
-    host?: string;
-    database: string;
-  };
-}
-
-interface DatabaseContextType {
-  activeConnectionId: string | null;
-  activeDriver: string | null;
-  activeTable: string | null;
-  activeConnectionName: string | null;
-  activeDatabaseName: string | null;
-  tables: TableInfo[];
-  isLoadingTables: boolean;
-  connect: (connectionId: string) => Promise<void>;
-  disconnect: () => void;
-  setActiveTable: (table: string | null) => void;
-  refreshTables: () => Promise<void>;
-}
-
-const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
+import { DatabaseContext, type TableInfo, type SavedConnection } from './DatabaseContext';
+import type { ReactNode } from 'react';
 
 export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
@@ -113,12 +85,4 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </DatabaseContext.Provider>
   );
-};
-
-export const useDatabase = () => {
-  const context = useContext(DatabaseContext);
-  if (context === undefined) {
-    throw new Error('useDatabase must be used within a DatabaseProvider');
-  }
-  return context;
 };

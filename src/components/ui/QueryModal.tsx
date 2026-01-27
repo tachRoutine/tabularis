@@ -40,8 +40,8 @@ export const QueryModal = ({ isOpen, onClose, onSave, initialName = '', initialS
     try {
         await onSave(name, sql);
         onClose();
-    } catch (err: any) {
-        setError(err.toString());
+    } catch (err) {
+        setError(String(err));
     } finally {
         setIsSaving(false);
     }

@@ -1,19 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-
-interface Settings {
-  queryLimit: number;
-}
-
-interface SettingsContextType {
-  settings: Settings;
-  updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
-}
-
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-const DEFAULT_SETTINGS: Settings = {
-  queryLimit: 500,
-};
+import { useEffect, useState, type ReactNode } from 'react';
+import { SettingsContext, DEFAULT_SETTINGS, type Settings } from './SettingsContext';
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<Settings>(() => {
@@ -34,12 +20,4 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </SettingsContext.Provider>
   );
-};
-
-export const useSettings = () => {
-  const context = useContext(SettingsContext);
-  if (context === undefined) {
-    throw new Error('useSettings must be used within a SettingsProvider');
-  }
-  return context;
 };

@@ -2,12 +2,21 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Database, Terminal, Settings, Table as TableIcon, Loader2, Copy, Hash, PlaySquare, FileText, Plus, ChevronRight, ChevronDown, FileCode, Play, Edit, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
-import { useDatabase } from '../../contexts/DatabaseContext';
-import { useSavedQueries, type SavedQuery } from '../../contexts/SavedQueriesContext';
+import { useDatabase } from '../../hooks/useDatabase';
+import { useSavedQueries } from '../../hooks/useSavedQueries';
+import type { SavedQuery } from '../../contexts/SavedQueriesContext';
 import { ContextMenu } from '../ui/ContextMenu';
 import { SchemaModal } from '../ui/SchemaModal';
 import { CreateTableModal } from '../ui/CreateTableModal';
 import { QueryModal } from '../ui/QueryModal';
+
+interface AccordionProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+}
 
 const NavItem = ({ to, icon: Icon, label, isConnected }: { to: string; icon: React.ElementType; label: string; isConnected?: boolean }) => (
   <NavLink
@@ -33,7 +42,8 @@ const NavItem = ({ to, icon: Icon, label, isConnected }: { to: string; icon: Rea
   </NavLink>
 );
 
-const Accordion = ({ title, isOpen, onToggle, children, actions }: any) => (
+const Accordion = ({ title, isOpen, onToggle, children, actions }: AccordionProps) => (
+
   <div className="flex flex-col mb-2">
     <div className="flex items-center justify-between px-2 py-1 group/acc">
         <button 
@@ -55,7 +65,7 @@ export const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'table' | 'query'; id: string; label: string; data?: any } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'table' | 'query'; id: string; label: string; data?: SavedQuery } | null>(null);
   const [schemaModalTable, setSchemaModalTable] = useState<string | null>(null);
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false);
   
@@ -82,7 +92,7 @@ export const Sidebar = () => {
     });
   };
 
-  const handleContextMenu = (e: React.MouseEvent, type: 'table' | 'query', id: string, label: string, data?: any) => {
+  const handleContextMenu = (e: React.MouseEvent, type: 'table' | 'query', id: string, label: string, data?: SavedQuery) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, type, id, label, data });
   };
@@ -284,7 +294,7 @@ export const Sidebar = () => {
             title={queryModal.query ? "Edit Query" : "Save Query"}
             initialName={queryModal.query?.name}
             initialSql={queryModal.query?.sql}
-            onSave={async (name, sql) => {
+            onSave={async (name: string, sql: string) => {
                 if (queryModal.query) {
                     await updateQuery(queryModal.query.id, name, sql);
                 }

@@ -12,7 +12,7 @@ import { EditRowModal } from './EditRowModal';
 
 interface DataGridProps {
   columns: string[];
-  data: any[][];
+  data: unknown[][];
   tableName?: string | null;
   pkColumn?: string | null;
   connectionId?: string | null;
@@ -20,9 +20,9 @@ interface DataGridProps {
 }
 
 export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onRefresh }: DataGridProps) => {
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: any[] } | null>(null);
-  const [editingCell, setEditingCell] = useState<{ rowIndex: number; colIndex: number; value: any } | null>(null);
-  const [editRowModalData, setEditRowModalData] = useState<any[] | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: unknown[] } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowIndex: number; colIndex: number; value: unknown } | null>(null);
+  const [editRowModalData, setEditRowModalData] = useState<unknown[] | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
     }
   }, [editingCell]);
 
-  const handleCellDoubleClick = (rowIndex: number, colIndex: number, value: any) => {
+  const handleCellDoubleClick = (rowIndex: number, colIndex: number, value: unknown) => {
     if (!tableName || !pkColumn) return; // Only edit if context is known
     setEditingCell({ rowIndex, colIndex, value });
   };
@@ -83,7 +83,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
     }
   };
 
-  const columnHelper = createColumnHelper<any[]>();
+  const columnHelper = createColumnHelper<unknown[]>();
   
   const tableColumns = React.useMemo(() => 
     columns.map((colName, index) => 
@@ -99,7 +99,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
         }
       })
     ),
-    [columns]
+    [columns, columnHelper]
   );
 
   const table = useReactTable({
@@ -108,7 +108,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const handleContextMenu = (e: React.MouseEvent, row: any[]) => {
+  const handleContextMenu = (e: React.MouseEvent, row: unknown[]) => {
     if (tableName && pkColumn) {
       e.preventDefault();
       setContextMenu({ x: e.clientX, y: e.clientY, row });
@@ -185,7 +185,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
                     {isEditing ? (
                         <input
                             ref={editInputRef}
-                            value={editingCell.value}
+                            value={String(editingCell.value ?? '')}
                             onChange={e => setEditingCell(prev => prev ? ({ ...prev, value: e.target.value }) : null)}
                             onBlur={handleEditCommit}
                             onKeyDown={handleKeyDown}

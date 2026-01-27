@@ -1,8 +1,10 @@
 # AGENTS.md
 
 ## Directives
-1. **Always Update Project Log:** Every session must end with an update to the "Project Log" section below, summarizing the status and actions taken.
-2. **Language:** Use **English** for all code comments, documentation, and commit messages.
+Adhere to the rules defined in the [rules directory](./.rules/):
+- [General Rules](./.rules/general.md) (Logging & Language)
+- [TypeScript Rules](./.rules/typescript.md)
+- [React Rules](./.rules/react.md)
 
 ## Project Log
 
@@ -130,3 +132,9 @@
         - **Error Capture:** Implemented rigorous stdout/stderr capture for system SSH process failures to surface actual errors (e.g., "Permission denied") to the user.
         - **Wait-for-Ready:** Fixed "first connection failure" by implementing an active wait loop (up to 10s) that verifies the local tunnel port is listening before returning success.
         - **Monitor Process:** Added logic to detect premature SSH process exit during tunnel initialization and return the captured error log immediately.
+
+### Session 15: Rules Definition
+- **Status:** Maintenance.
+- **Actions:**
+    - **Rules:** Created `.rules/` directory and defined `typescript.md` and `react.md` to prevent common linting/runtime errors (Any types, Hook deps, Sync setState, Fast Refresh).
+    - **Docs:** Updated `AGENTS.md` to link and enforce these new rules.

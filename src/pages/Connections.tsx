@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { NewConnectionModal } from '../components/ui/NewConnectionModal';
 import { invoke } from '@tauri-apps/api/core';
 import { Database, Plus, Power, Edit, Trash2, Shield, AlertCircle } from 'lucide-react';
-import { useDatabase } from '../contexts/DatabaseContext';
+import { useDatabase } from '../hooks/useDatabase';
 
 interface SavedConnection {
   id: string;
@@ -42,7 +42,10 @@ export const Connections = () => {
   };
 
   useEffect(() => {
-    loadConnections();
+    const init = async () => {
+      await loadConnections();
+    };
+    void init();
   }, []);
 
   const handleSave = () => {
@@ -206,7 +209,7 @@ export const Connections = () => {
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingConnection(null); }}
         onSave={handleSave}
-        initialConnection={editingConnection as any}
+        initialConnection={editingConnection}
       />
     </div>
   );

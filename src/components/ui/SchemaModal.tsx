@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Key } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { useDatabase } from '../../contexts/DatabaseContext';
+import { useDatabase } from '../../hooks/useDatabase';
 
 interface TableColumn {
   name: string;
@@ -22,16 +22,24 @@ export const SchemaModal = ({ isOpen, onClose, tableName }: SchemaModalProps) =>
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && activeConnectionId && tableName) {
+    if (!isOpen || !activeConnectionId || !tableName) return;
+    
+    const loadSchema = async () => {
       setLoading(true);
-      invoke<TableColumn[]>('get_columns', { 
-        connectionId: activeConnectionId, 
-        tableName 
-      })
-      .then(setColumns)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-    }
+      try {
+        const cols = await invoke<TableColumn[]>('get_columns', { 
+          connectionId: activeConnectionId, 
+          tableName 
+        });
+        setColumns(cols);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    void loadSchema();
   }, [isOpen, activeConnectionId, tableName]);
 
   if (!isOpen) return null;

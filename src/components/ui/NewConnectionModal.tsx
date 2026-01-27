@@ -50,27 +50,31 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave, initialConnection 
 
   // Populate form on open if editing
   useEffect(() => {
-      if (isOpen) {
-          if (initialConnection) {
-              setName(initialConnection.name);
-              setDriver(initialConnection.params.driver);
-              setFormData({ ...initialConnection.params });
-          } else {
-              // Reset to defaults
-              setName('');
-              setDriver('postgres');
-              setFormData({
-                host: 'localhost',
-                port: 5432,
-                username: 'postgres',
-                database: 'postgres',
-                ssh_enabled: false,
-                ssh_port: 22
-              });
-          }
-          setStatus('idle');
-          setMessage('');
-      }
+      if (!isOpen) return;
+      
+      const initializeForm = () => {
+        if (initialConnection) {
+            setName(initialConnection.name);
+            setDriver(initialConnection.params.driver);
+            setFormData({ ...initialConnection.params });
+        } else {
+            // Reset to defaults
+            setName('');
+            setDriver('postgres');
+            setFormData({
+              host: 'localhost',
+              port: 5432,
+              username: 'postgres',
+              database: 'postgres',
+              ssh_enabled: false,
+              ssh_port: 22
+            });
+        }
+        setStatus('idle');
+        setMessage('');
+      };
+      
+      initializeForm();
   }, [isOpen, initialConnection]);
 
   if (!isOpen) return null;
@@ -88,7 +92,7 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave, initialConnection 
     setMessage('');
   };
 
-  const updateField = (field: keyof ConnectionParams, value: any) => {
+  const updateField = (field: keyof ConnectionParams, value: string | number | boolean | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -106,10 +110,10 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave, initialConnection 
       setStatus('success');
       setMessage(result);
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Connection test error:", err);
       setStatus('error');
-      const msg = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+      const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : JSON.stringify(err));
       setMessage(msg);
       return false;
     }
@@ -147,7 +151,7 @@ export const NewConnectionModal = ({ isOpen, onClose, onSave, initialConnection 
       
       if (onSave) onSave();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       setStatus('error');
       setMessage(typeof err === 'string' ? err : 'Failed to save connection');
     }

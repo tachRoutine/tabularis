@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Plus, Trash2, Save, Code, Loader2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { useDatabase } from '../../contexts/DatabaseContext';
+import { useDatabase } from '../../hooks/useDatabase';
 
 // Common types across DBs (simplified for MVP)
 const COMMON_TYPES = [
@@ -39,7 +39,7 @@ export const CreateTableModal = ({ isOpen, onClose, onSuccess }: CreateTableModa
   // Determine current driver
   const currentDriver = activeDriver || 'sqlite';
 
-  const generateSql = () => {
+  const sqlPreview = useMemo(() => {
     if (!tableName.trim()) return '-- Table name is required';
     if (columns.length === 0) return '-- At least one column is required';
 
@@ -100,9 +100,7 @@ export const CreateTableModal = ({ isOpen, onClose, onSuccess }: CreateTableModa
 
     sql += '\n);';
     return sql;
-  };
-
-  const sqlPreview = useMemo(() => generateSql(), [tableName, columns, currentDriver]);
+  }, [tableName, columns, currentDriver]);
 
   const handleAddColumn = () => {
     setColumns([...columns, {
@@ -121,7 +119,7 @@ export const CreateTableModal = ({ isOpen, onClose, onSuccess }: CreateTableModa
     setColumns(columns.filter(c => c.id !== id));
   };
 
-  const updateColumn = (id: string, field: keyof ColumnDef, value: any) => {
+  const updateColumn = (id: string, field: keyof ColumnDef, value: string | boolean) => {
     setColumns(columns.map(c => {
       if (c.id !== id) return c;
       return { ...c, [field]: value };
@@ -146,9 +144,9 @@ export const CreateTableModal = ({ isOpen, onClose, onSuccess }: CreateTableModa
         // Reset state
         setTableName('');
         setColumns([{ id: '1', name: 'id', type: 'INTEGER', length: '', isPk: true, isNullable: false, isAutoInc: true, defaultValue: '' }]);
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error(e);
-        setError('Failed to create table: ' + e);
+        setError('Failed to create table: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
         setLoading(false);
     }
