@@ -71,6 +71,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to fetch tables:', error);
       setActiveConnectionId(null);
       setActiveDriver(null);
+      throw error;
     } finally {
       setIsLoadingTables(false);
     }

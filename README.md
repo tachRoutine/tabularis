@@ -21,6 +21,7 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 - Support for **PostgreSQL**, **MySQL/MariaDB**, and **SQLite**.
 - Save and manage multiple connection profiles.
 - Secure local persistence of connection settings.
+- **SSH Tunneling:** Connect to remote databases securely via SSH tunnels (Configurable via UI).
 
 ### 🗄️ Database Explorer
 - **Sidebar Navigation:** Quickly browse tables in your active connection.

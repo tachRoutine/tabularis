@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NewConnectionModal } from '../components/ui/NewConnectionModal';
 import { invoke } from '@tauri-apps/api/core';
-import { Database, Plus, Power, Edit, Trash2, Shield } from 'lucide-react';
+import { Database, Plus, Power, Edit, Trash2, Shield, AlertCircle } from 'lucide-react';
 import { useDatabase } from '../contexts/DatabaseContext';
 
 interface SavedConnection {
@@ -30,6 +30,7 @@ export const Connections = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<SavedConnection | null>(null);
   const [connections, setConnections] = useState<SavedConnection[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const loadConnections = async () => {
     try {
@@ -51,8 +52,14 @@ export const Connections = () => {
   };
 
   const handleConnect = async (conn: SavedConnection) => {
-    await connect(conn.id);
-    navigate('/editor');
+    setError(null);
+    try {
+      await connect(conn.id);
+      navigate('/editor');
+    } catch (e) {
+      console.error(e);
+      setError(`Failed to connect to ${conn.name}. Please check your settings or ensuring the database is running.`);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -83,6 +90,13 @@ export const Connections = () => {
           Add Connection
         </button>
       </div>
+      
+      {error && (
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-900/50 rounded-lg flex items-center gap-3 text-red-400">
+          <AlertCircle size={20} />
+          <span>{error}</span>
+        </div>
+      )}
       
       {connections.length === 0 ? (
         <div className="p-8 border border-slate-800 rounded-lg bg-slate-900/50 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">

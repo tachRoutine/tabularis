@@ -53,3 +53,9 @@
 - **Next Steps:**
     - Implement actual SSH tunneling logic in Rust backend.
     - Multiple Query Tabs.
+
+### Session 7: Error Handling & Robustness
+- **Status:** In Progress.
+- **Actions:**
+    - **Connection Safety:** Prevent entering SQL Editor when connection fails.
+    - **Error Feedback:** Show user-friendly errors on connection failure.
