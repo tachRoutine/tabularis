@@ -1,7 +1,7 @@
 # Maintainer: Debba <debba@example.com>
 pkgname=tabularis-bin
 _pkgname=tabularis
-pkgver=0.6.0
+pkgver=x.y.z
 pkgrel=1
 pkgdesc="A database manager for developers"
 arch=('x86_64')
@@ -14,5 +14,5 @@ source=("${_pkgname}_${pkgver}_amd64.deb::${url}/releases/download/v${pkgver}/${
 sha256sums=('SKIP')
 
 package() {
-	tar -xf data.tar.zst -C "${pkgdir}"
+    bsdtar -xf data.tar.* -C "${pkgdir}"
 }
