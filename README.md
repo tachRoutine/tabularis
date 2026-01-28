@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="public/logo.png" width="128" height="128" />
+</div>
+
 # tabularis
 
 ![](https://img.shields.io/github/release/debba/tabularis.svg?style=flat)
@@ -26,7 +30,7 @@ yay -S tabularis-bin
 ```
 
 <div align="center">
-  <img src="screenshots/overview.png" width="80%" alt="Main Window" />
+  <img src="screenshots/overview.png?v" width="80%" alt="Tabularis" />
 </div>
 
 ## Gallery
