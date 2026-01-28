@@ -17,9 +17,9 @@ jobs:
       - name: Update README.md
         run: |
           TAG=${{ steps.fetch-latest-release.outputs.latest-release }}
-          WINDOWS="https://github.com/debba/debba.sql/releases/download/$TAG/debba.sql_${TAG#v}_x64-setup.exe"
-          MACOS="https://github.com/debba/debba.sql/releases/download/$TAG/debba.sql_${TAG#v}_x64.dmg"
-          LINUX="https://github.com/debba/debba.sql/releases/download/$TAG/debba.sql_${TAG#v}_amd64.AppImage"
+          WINDOWS="https://github.com/debba/tabularis/releases/download/$TAG/tabularis_${TAG#v}_x64-setup.exe"
+          MACOS="https://github.com/debba/tabularis/releases/download/$TAG/tabularis_${TAG#v}_x64.dmg"
+          LINUX="https://github.com/debba/tabularis/releases/download/$TAG/tabularis_${TAG#v}_amd64.AppImage"
 
           DOWNLOAD_SECTION="[![Windows](https://img.shields.io/badge/Windows-Download-blue?logo=windows)]($WINDOWS) \
           [![macOS](https://img.shields.io/badge/macOS-Download-black?logo=apple)]($MACOS) \
