@@ -19,8 +19,8 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     const updateTitle = async () => {
       try {
         const title = (activeConnectionName && activeDatabaseName)
-          ? `debba.sql - ${activeConnectionName} (${activeDatabaseName})`
-          : 'debba.sql';
+          ? `tabularis - ${activeConnectionName} (${activeDatabaseName})`
+          : 'tabularis';
         await invoke('set_window_title', { title });
       } catch (e) {
         console.error('Failed to update window title', e);

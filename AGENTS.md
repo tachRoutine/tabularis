@@ -293,3 +293,13 @@ Adhere to the rules defined in the [rules directory](./.rules/):
         - **Backend:** Implemented logic to optionally store Database and SSH passwords in the system keychain (debba-sql service) instead of plain text JSON.
         - **Frontend:** Added "Save passwords in Keychain" checkbox to the Connection Modal.
     - **Persistence:** Updated saving/loading/duplicating logic to handle hybrid storage (JSON config + Keychain).
+
+### Session 25: Rebranding to tabularis
+- **Status:** Maintenance.
+- **Actions:**
+    - **Rebranding:** Renamed project to **tabularis**.
+    - **Configuration:** Updated `package.json`, `Cargo.toml`, `tauri.conf.json`.
+    - **UI:** Updated window title, sidebar branding, and settings page.
+    - **Persistence:** Changed localStorage key to `tabularis_settings`.
+    - **Security:** Updated keychain service name to `tabularis`.
+    - **Docs:** Updated `README.md` and branding references.

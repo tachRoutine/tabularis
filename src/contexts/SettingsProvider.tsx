@@ -3,12 +3,12 @@ import { SettingsContext, DEFAULT_SETTINGS, type Settings } from './SettingsCont
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<Settings>(() => {
-    const saved = localStorage.getItem('debba_sql_settings');
+    const saved = localStorage.getItem('tabularis_settings');
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
   });
 
   useEffect(() => {
-    localStorage.setItem('debba_sql_settings', JSON.stringify(settings));
+    localStorage.setItem('tabularis_settings', JSON.stringify(settings));
   }, [settings]);
 
   const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {

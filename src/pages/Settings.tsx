@@ -95,10 +95,10 @@ export const Settings = () => {
                   </div>
                   
                   <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-blue-500/30">
-                      <span className="text-2xl font-bold text-white">ds</span>
+                      <span className="text-2xl font-bold text-white">ta</span>
                   </div>
                   
-                  <h1 className="text-3xl font-bold text-white mb-2">debba.sql</h1>
+                  <h1 className="text-3xl font-bold text-white mb-2">tabularis</h1>
                   <p className="text-slate-400 max-w-lg mx-auto mb-6">
                       A lightweight, developer-focused database manager built with Tauri, Rust, and React. 
                       Born from a "vibe coding" experiment to create a modern, native tool in record time.
@@ -106,7 +106,7 @@ export const Settings = () => {
                   
                   <div className="flex justify-center gap-4">
                       <a 
-                          href="https://github.com/debba/debba.sql" 
+                          href="https://github.com/debba/tabularis" 
                           target="_blank" 
                           rel="noreferrer"
                           className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-medium transition-colors border border-slate-700"
@@ -155,15 +155,15 @@ export const Settings = () => {
                   <Heart size={32} className="text-red-500 mb-3 animate-pulse" />
                   <h3 className="text-lg font-semibold text-white mb-2">Support the Development</h3>
                   <p className="text-slate-400 text-sm mb-4 max-w-md">
-                      If you like <strong>debba.sql</strong> and want to see more features, consider supporting the project by contributing code, reporting bugs, or starring the repo.
+                      If you like <strong>tabularis</strong> and want to see more features, consider supporting the project by contributing code, reporting bugs, or starring the repo.
                   </p>
                   <a 
-                      href="https://github.com/debba/debba.sql" 
+                      href="https://github.com/debba/tabularis" 
                       target="_blank" 
                       rel="noreferrer"
                       className="text-blue-400 hover:text-blue-300 font-medium text-sm hover:underline"
                   >
-                      github.com/debba/debba.sql
+                      github.com/debba/tabularis
                   </a>
               </div>
             </div>

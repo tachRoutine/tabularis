@@ -514,9 +514,9 @@ export const Sidebar = () => {
     <div className="flex h-full">
       {/* Primary Navigation Bar (Narrow) */}
       <aside className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-4 z-20">
-        <div className="mb-8" title="debba.sql">
+        <div className="mb-8" title="tabularis">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-lg shadow-blue-900/20 border border-blue-500/30">
-            ds
+            ta
           </div>
         </div>
         

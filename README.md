@@ -1,9 +1,9 @@
-# debba.sql
+# tabularis
 
-![](https://img.shields.io/github/release/debba/debba.sql.svg?style=flat)
-![](https://img.shields.io/github/downloads/debba/debba.sql/total.svg?style=flat)
-![Build & Release](https://github.com/debba/debba.sql/workflows/Release/badge.svg)
-[![Known Vulnerabilities](https://snyk.io//test/github/debba/debba.sql/badge.svg?targetFile=package.json)](https://snyk.io//test/github/debba/debba.sql?targetFile=package.json)
+![](https://img.shields.io/github/release/debba/tabularis.svg?style=flat)
+![](https://img.shields.io/github/downloads/debba/tabularis/total.svg?style=flat)
+![Build & Release](https://github.com/debba/tabularis/workflows/Release/badge.svg)
+[![Known Vulnerabilities](https://snyk.io//test/github/debba/tabularis/badge.svg?targetFile=package.json)](https://snyk.io//test/github/debba/tabularis?targetFile=package.json)
 
 A lightweight, developer-focused database management tool, built with Tauri and React.
 
@@ -12,7 +12,7 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 ## Release Download:
 
 <!-- DOWNLOAD_SECTION_START -->
-[![Windows](https://img.shields.io/badge/Windows-Download-blue?logo=windows)](https://github.com/debba/debba.sql/releases/download/v0.5.0/debba.sql_0.5.0_x64-setup.exe) [![macOS](https://img.shields.io/badge/macOS-Download-black?logo=apple)](https://github.com/debba/debba.sql/releases/download/v0.5.0/debba.sql_0.5.0_x64.dmg) [![Linux](https://img.shields.io/badge/Linux-Download-green?logo=linux)](https://github.com/debba/debba.sql/releases/download/v0.5.0/debba.sql_0.5.0_amd64.AppImage)
+[![Windows](https://img.shields.io/badge/Windows-Download-blue?logo=windows)](https://github.com/debba/tabularis/releases/download/v0.5.0/tabularis_0.5.0_x64-setup.exe) [![macOS](https://img.shields.io/badge/macOS-Download-black?logo=apple)](https://github.com/debba/tabularis/releases/download/v0.5.0/tabularis_0.5.0_x64.dmg) [![Linux](https://img.shields.io/badge/Linux-Download-green?logo=linux)](https://github.com/debba/tabularis/releases/download/v0.5.0/tabularis_0.5.0_amd64.AppImage)
 <!-- DOWNLOAD_SECTION_END -->
 
 <div align="center">
@@ -98,9 +98,9 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 
 Connection profiles are saved locally in `connections.json` at:
 
-- **Linux:** `~/.config/com.debba.sql/`
-- **macOS:** `~/Library/Application Support/com.debba.sql/`
-- **Windows:** `%APPDATA%\com.debba.sql\`
+- **Linux:** `~/.config/tabularis/`
+- **macOS:** `~/Library/Application Support/tabularis/`
+- **Windows:** `%APPDATA%\tabularis\`
 
 ## Tech Stack
 

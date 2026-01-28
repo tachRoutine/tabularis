@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "debba.sql",
+  "productName": "tabularis",
   "version": "0.5.0",
-  "identifier": "com.debba.sql",
+  "identifier": "tabularis",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "debba.sql",
+        "title": "tabularis",
         "width": 1280,
         "height": 800,
         "resizable": true,
