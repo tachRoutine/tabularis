@@ -6,7 +6,8 @@ const paths = {
   package: resolve('package.json'),
   tauri: resolve('src-tauri/tauri.conf.json'),
   cargo: resolve('src-tauri/Cargo.toml'),
-  appVersion: resolve('src/version.ts')
+  appVersion: resolve('src/version.ts'),
+  website: resolve('website/index.html')
 };
 
 // 1. Leggi la nuova versione da package.json (che è già stato aggiornato da npm version)
@@ -38,3 +39,28 @@ console.log('✅ Updated Cargo.toml');
 const versionContent = `export const APP_VERSION = "${newVersion}";\n`;
 writeFileSync(paths.appVersion, versionContent);
 console.log('✅ Updated src/version.ts');
+
+// 5. Aggiorna website/index.html
+let website = readFileSync(paths.website, 'utf-8');
+
+// Aggiorna il badge della versione: <span class="badge version">v0.6.0</span>
+website = website.replace(
+  /<span class="badge version">v.*?<\/span>/,
+  `<span class="badge version">v${newVersion}</span>`
+);
+
+// Aggiorna i link di download (sia il tag vX.Y.Z nell'URL che il nome file tabularis_X.Y.Z_)
+// URL: releases/download/v0.6.0/tabularis_0.6.0_...
+// Sostituisce tutte le occorrenze globalmente
+website = website.replace(
+  /releases\/download\/v.*?\//g,
+  `releases/download/v${newVersion}/`
+);
+
+website = website.replace(
+  /tabularis_\d+\.\d+\.\d+_/g,
+  `tabularis_${newVersion}_`
+);
+
+writeFileSync(paths.website, website);
+console.log('✅ Updated website/index.html');
