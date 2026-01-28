@@ -15,6 +15,7 @@ pub struct ConnectionParams {
     pub ssh_user: Option<String>,
     pub ssh_password: Option<String>,
     pub ssh_key_file: Option<String>,
+    pub save_in_keychain: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

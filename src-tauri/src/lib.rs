@@ -2,6 +2,7 @@ pub mod commands;
 pub mod ssh_tunnel;
 pub mod saved_queries;
 pub mod models;
+pub mod keychain_utils;
 pub mod drivers {
     pub mod common;
     pub mod mysql;

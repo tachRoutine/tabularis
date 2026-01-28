@@ -1,18 +1,21 @@
+use sqlx::any::AnyConnectOptions;
+use sqlx::{AnyConnection, Connection};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tauri::{AppHandle, Manager, Runtime, State};
-use uuid::Uuid;
-use sqlx::any::AnyConnectOptions;
-use sqlx::{Connection, AnyConnection};
-use urlencoding::encode;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Manager, Runtime, State};
 use tokio::task::AbortHandle;
+use urlencoding::encode;
+use uuid::Uuid;
 
-use crate::ssh_tunnel::{SshTunnel, get_tunnels};
-use crate::models::{ConnectionParams, SavedConnection, TableInfo, TableColumn, QueryResult, ForeignKey, Index};
 use crate::drivers::{mysql, postgres, sqlite};
+use crate::keychain_utils;
+use crate::models::{
+    ConnectionParams, ForeignKey, Index, QueryResult, SavedConnection, TableColumn, TableInfo,
+};
+use crate::ssh_tunnel::{get_tunnels, SshTunnel};
 
 pub struct QueryCancellationState {
     pub handles: Arc<Mutex<HashMap<String, AbortHandle>>>,
@@ -36,8 +39,11 @@ fn resolve_connection_params(params: &ConnectionParams) -> Result<ConnectionPara
         let remote_host = params.host.as_deref().unwrap_or("localhost");
         let remote_port = params.port.unwrap_or(3306);
 
-        let map_key = format!("{}@{}:{}:{}->{}", ssh_user, ssh_host, ssh_port, remote_host, remote_port);
-        
+        let map_key = format!(
+            "{}@{}:{}:{}->{}",
+            ssh_user, ssh_host, ssh_port, remote_host, remote_port
+        );
+
         {
             let tunnels = get_tunnels().lock().unwrap();
             if let Some(tunnel) = tunnels.get(&map_key) {
@@ -47,24 +53,28 @@ fn resolve_connection_params(params: &ConnectionParams) -> Result<ConnectionPara
                 return Ok(new_params);
             }
         }
-        
+
         let tunnel = SshTunnel::new(
-            ssh_host, ssh_port, ssh_user, 
-            params.ssh_password.as_deref(), 
+            ssh_host,
+            ssh_port,
+            ssh_user,
+            params.ssh_password.as_deref(),
             params.ssh_key_file.as_deref(),
-            remote_host, remote_port
-        ).map_err(|e| {
+            remote_host,
+            remote_port,
+        )
+        .map_err(|e| {
             eprintln!("[Connection Error] SSH Tunnel setup failed: {}", e);
             e
         })?;
-        
+
         let local_port = tunnel.local_port;
-        
+
         {
             let mut tunnels = get_tunnels().lock().unwrap();
             tunnels.insert(map_key, tunnel);
         }
-        
+
         let mut new_params = params.clone();
         new_params.host = Some("127.0.0.1".to_string());
         new_params.port = Some(local_port);
@@ -92,10 +102,29 @@ fn find_connection_by_id<R: Runtime>(
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
-    connections
+    let mut conn = connections
         .into_iter()
         .find(|c| c.id == id)
-        .ok_or_else(|| "Connection not found".to_string())
+        .ok_or_else(|| "Connection not found".to_string())?;
+
+    if conn.params.save_in_keychain.unwrap_or(false) {
+        match keychain_utils::get_db_password(&conn.id) {
+            Ok(pwd) => conn.params.password = Some(pwd),
+            Err(e) => eprintln!(
+                "[Warning] Failed to retrieve DB password for connection '{}' ({}): {}",
+                conn.name, conn.id, e
+            ),
+        }
+        match keychain_utils::get_ssh_password(&conn.id) {
+            Ok(ssh_pwd) => conn.params.ssh_password = Some(ssh_pwd),
+            Err(e) => eprintln!(
+                "[Warning] Failed to retrieve SSH password for connection '{}' ({}): {}",
+                conn.name, conn.id, e
+            ),
+        }
+    }
+
+    Ok(conn)
 }
 
 // --- Commands ---
@@ -113,30 +142,51 @@ pub async fn save_connection<R: Runtime>(
     } else {
         Vec::new()
     };
+
+    let id = Uuid::new_v4().to_string();
+    let mut params_to_save = params.clone();
+
+    if params.save_in_keychain.unwrap_or(false) {
+        if let Some(pwd) = &params.password {
+            keychain_utils::set_db_password(&id, pwd)?;
+        }
+        if let Some(ssh_pwd) = &params.ssh_password {
+            keychain_utils::set_ssh_password(&id, ssh_pwd)?;
+        }
+        params_to_save.password = None;
+        params_to_save.ssh_password = None;
+    }
+
     let new_conn = SavedConnection {
-        id: Uuid::new_v4().to_string(),
+        id: id.clone(),
         name,
-        params,
+        params: params_to_save,
     };
     connections.push(new_conn.clone());
     let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())?;
-    Ok(new_conn)
+
+    let mut returned_conn = new_conn;
+    returned_conn.params = params; // Return with password for frontend state
+    Ok(returned_conn)
 }
 
 #[tauri::command]
-pub async fn delete_connection<R: Runtime>(
-    app: AppHandle<R>,
-    id: String,
-) -> Result<(), String> {
+pub async fn delete_connection<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
     let path = get_config_path(&app)?;
-    if !path.exists() { return Ok(()); }
-    
+    if !path.exists() {
+        return Ok(());
+    }
+
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
-    
+
     connections.retain(|c| c.id != id);
-    
+
+    // Attempt to remove passwords from keychain (ignore if not found)
+    keychain_utils::delete_db_password(&id).ok();
+    keychain_utils::delete_ssh_password(&id).ok();
+
     let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())?;
     Ok(())
@@ -152,20 +202,42 @@ pub async fn update_connection<R: Runtime>(
     let path = get_config_path(&app)?;
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
-    
-    let conn_idx = connections.iter().position(|c| c.id == id).ok_or("Connection not found")?;
-    
+
+    let conn_idx = connections
+        .iter()
+        .position(|c| c.id == id)
+        .ok_or("Connection not found")?;
+
+    let mut params_to_save = params.clone();
+
+    if params.save_in_keychain.unwrap_or(false) {
+        if let Some(pwd) = &params.password {
+            keychain_utils::set_db_password(&id, pwd)?;
+        }
+        if let Some(ssh_pwd) = &params.ssh_password {
+            keychain_utils::set_ssh_password(&id, ssh_pwd)?;
+        }
+        params_to_save.password = None;
+        params_to_save.ssh_password = None;
+    } else {
+        keychain_utils::delete_db_password(&id).ok();
+        keychain_utils::delete_ssh_password(&id).ok();
+    }
+
     let updated = SavedConnection {
         id: id.clone(),
         name,
-        params,
+        params: params_to_save,
     };
-    
+
     connections[conn_idx] = updated.clone();
-    
+
     let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())?;
-    Ok(updated)
+
+    let mut returned_conn = updated;
+    returned_conn.params = params;
+    Ok(returned_conn)
 }
 
 #[tauri::command]
@@ -176,20 +248,59 @@ pub async fn duplicate_connection<R: Runtime>(
     let path = get_config_path(&app)?;
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
-    
-    let original = connections.iter().find(|c| c.id == id).ok_or("Connection not found")?.clone();
-    
+
+    let original_idx = connections
+        .iter()
+        .position(|c| c.id == id)
+        .ok_or("Connection not found")?;
+    let mut original = connections[original_idx].clone();
+
+    // Recover passwords if in keychain
+    if original.params.save_in_keychain.unwrap_or(false) {
+        if let Ok(pwd) = keychain_utils::get_db_password(&original.id) {
+            original.params.password = Some(pwd);
+        }
+        if let Ok(ssh_pwd) = keychain_utils::get_ssh_password(&original.id) {
+            original.params.ssh_password = Some(ssh_pwd);
+        }
+    }
+
+    let new_id = Uuid::new_v4().to_string();
+    let mut new_params = original.params.clone();
+
+    // Save passwords to new keychain entries if enabled
+    if new_params.save_in_keychain.unwrap_or(false) {
+        if let Some(pwd) = &new_params.password {
+            keychain_utils::set_db_password(&new_id, pwd)?;
+        }
+        if let Some(ssh_pwd) = &new_params.ssh_password {
+            keychain_utils::set_ssh_password(&new_id, ssh_pwd)?;
+        }
+        new_params.password = None;
+        new_params.ssh_password = None;
+    }
+
     let new_conn = SavedConnection {
-        id: Uuid::new_v4().to_string(),
+        id: new_id,
         name: format!("{} (Copy)", original.name),
-        params: original.params,
+        params: new_params,
     };
-    
+
     connections.push(new_conn.clone());
-    
+
     let json = serde_json::to_string_pretty(&connections).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())?;
-    Ok(new_conn)
+
+    let mut returned_conn = new_conn;
+    // Return with passwords for frontend consistency
+    if returned_conn.params.save_in_keychain.unwrap_or(false) {
+        // We can just use the values from `original.params` as they are identical (unless we cleared them in new_params)
+        // Actually original.params holds the clear text now.
+        returned_conn.params.password = original.params.password;
+        returned_conn.params.ssh_password = original.params.ssh_password;
+    }
+
+    Ok(returned_conn)
 }
 
 #[tauri::command]
@@ -201,32 +312,66 @@ pub async fn get_connections<R: Runtime>(
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
+    let mut connections: Vec<SavedConnection> = serde_json::from_str(&content).unwrap_or_default();
+
+    // Populate passwords from keychain if needed
+    for conn in &mut connections {
+        if conn.params.save_in_keychain.unwrap_or(false) {
+            match keychain_utils::get_db_password(&conn.id) {
+                Ok(pwd) => conn.params.password = Some(pwd),
+                Err(e) => eprintln!(
+                    "[Keyring Error] Failed to get DB password for {}: {}",
+                    conn.id, e
+                ),
+            }
+            if let Ok(ssh_pwd) = keychain_utils::get_ssh_password(&conn.id) {
+                conn.params.ssh_password = Some(ssh_pwd);
+            }
+        }
+    }
+
     Ok(connections)
 }
 
 #[tauri::command]
 pub async fn test_connection(params: ConnectionParams) -> Result<String, String> {
     let resolved_params = resolve_connection_params(&params)?;
-    println!("[Test Connection] Resolved Params: Host={:?}, Port={:?}", resolved_params.host, resolved_params.port);
-    
+    println!(
+        "[Test Connection] Resolved Params: Host={:?}, Port={:?}",
+        resolved_params.host, resolved_params.port
+    );
+
     let user = encode(resolved_params.username.as_deref().unwrap_or_default());
     let pass = encode(resolved_params.password.as_deref().unwrap_or_default());
     let host = resolved_params.host.as_deref().unwrap_or("localhost");
 
     let url = match resolved_params.driver.as_str() {
         "sqlite" => format!("sqlite://{}", resolved_params.database),
-        "postgres" => format!("postgres://{}:{}@{}:{}/{}", 
-            user, pass, host, resolved_params.port.unwrap_or(5432), resolved_params.database),
-        "mysql" => format!("mysql://{}:{}@{}:{}/{}", 
-            user, pass, host, resolved_params.port.unwrap_or(3306), resolved_params.database),
+        "postgres" => format!(
+            "postgres://{}:{}@{}:{}/{}",
+            user,
+            pass,
+            host,
+            resolved_params.port.unwrap_or(5432),
+            resolved_params.database
+        ),
+        "mysql" => format!(
+            "mysql://{}:{}@{}:{}/{}",
+            user,
+            pass,
+            host,
+            resolved_params.port.unwrap_or(3306),
+            resolved_params.database
+        ),
         _ => return Err("Unsupported driver".into()),
     };
-    
+
     println!("[Test Connection] URL: {}", url);
 
     let options = AnyConnectOptions::from_str(&url).map_err(|e| e.to_string())?;
-    let mut conn = AnyConnection::connect_with(&options).await.map_err(|e: sqlx::Error| e.to_string())?;
+    let mut conn = AnyConnection::connect_with(&options)
+        .await
+        .map_err(|e: sqlx::Error| e.to_string())?;
     conn.ping().await.map_err(|e: sqlx::Error| e.to_string())?;
     Ok("Connection successful!".to_string())
 }
@@ -326,8 +471,12 @@ pub async fn update_record<R: Runtime>(
     let params = resolve_connection_params(&saved_conn.params)?;
     match saved_conn.params.driver.as_str() {
         "mysql" => mysql::update_record(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
-        "postgres" => postgres::update_record(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
-        "sqlite" => sqlite::update_record(&params, &table, &pk_col, pk_val, &col_name, new_val).await,
+        "postgres" => {
+            postgres::update_record(&params, &table, &pk_col, pk_val, &col_name, new_val).await
+        }
+        "sqlite" => {
+            sqlite::update_record(&params, &table, &pk_col, pk_val, &col_name, new_val).await
+        }
         _ => Err("Unsupported driver".into()),
     }
 }
@@ -377,14 +526,20 @@ pub async fn execute_query<R: Runtime>(
 
     let saved_conn = find_connection_by_id(&app, &connection_id)?;
     let params = resolve_connection_params(&saved_conn.params)?;
-    
+
     // 2. Spawn Cancellable Task
     let task = tokio::spawn(async move {
         match saved_conn.params.driver.as_str() {
-            "mysql" => mysql::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await,
-            "postgres" => postgres::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await,
-            "sqlite" => sqlite::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await,
-            _ => Err("Unsupported driver".into())
+            "mysql" => {
+                mysql::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await
+            }
+            "postgres" => {
+                postgres::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await
+            }
+            "sqlite" => {
+                sqlite::execute_query(&params, &sanitized_query, limit, page.unwrap_or(1)).await
+            }
+            _ => Err("Unsupported driver".into()),
         }
     });
 

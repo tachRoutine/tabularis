@@ -284,3 +284,12 @@ Adhere to the rules defined in the [rules directory](./.rules/):
     - **Editor UI:**
         - **Hide/Show Results:** Increased size of the toggle bar and button for better accessibility and clickability.
         - **Resize Handle:** Increased height of the resize handle (from 8px to 24px) to make it easier to grab.
+
+### Session 24: Keychain Integration
+- **Status:** Feature Complete.
+- **Actions:**
+    - **Security:**
+        - Integrated `keyring` crate for secure password storage.
+        - **Backend:** Implemented logic to optionally store Database and SSH passwords in the system keychain (debba-sql service) instead of plain text JSON.
+        - **Frontend:** Added "Save passwords in Keychain" checkbox to the Connection Modal.
+    - **Persistence:** Updated saving/loading/duplicating logic to handle hybrid storage (JSON config + Keychain).
