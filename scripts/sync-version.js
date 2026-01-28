@@ -5,7 +5,8 @@ import { resolve } from 'path';
 const paths = {
   package: resolve('package.json'),
   tauri: resolve('src-tauri/tauri.conf.json'),
-  cargo: resolve('src-tauri/Cargo.toml')
+  cargo: resolve('src-tauri/Cargo.toml'),
+  appVersion: resolve('src/version.ts')
 };
 
 // 1. Leggi la nuova versione da package.json (che è già stato aggiornato da npm version)
@@ -32,3 +33,8 @@ cargo = cargo.replace(
 );
 writeFileSync(paths.cargo, cargo);
 console.log('✅ Updated Cargo.toml');
+
+// 4. Aggiorna src/version.ts
+const versionContent = `export const APP_VERSION = "${newVersion}";\n`;
+writeFileSync(paths.appVersion, versionContent);
+console.log('✅ Updated src/version.ts');

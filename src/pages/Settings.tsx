@@ -13,6 +13,7 @@ import {
 import clsx from "clsx";
 import { useSettings } from "../hooks/useSettings";
 import type { AppLanguage } from "../contexts/SettingsContext";
+import { APP_VERSION } from "../version";
 
 export const Settings = () => {
   const { t } = useTranslation();
@@ -189,7 +190,7 @@ export const Settings = () => {
                     <span className="text-xs font-bold uppercase tracking-wider">
                       {t("settings.version")}
                     </span>
-                    <span className="font-mono font-bold">0.6.0 (Beta)</span>
+                    <span className="font-mono font-bold">{APP_VERSION} (Beta)</span>
                   </div>
                 </div>
               </div>
