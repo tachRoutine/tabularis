@@ -32,38 +32,6 @@ A lightweight, developer-focused database management tool, built with Tauri and 
 
 ## Features
 
-### 🔒 New in v0.6.0
-
-- **Internationalization (i18n):**
-  - Full support for **English** (default) and **Italian**.
-  - Automatic system language detection.
-  - Manual language override in Settings.
-- **Breaking Change:** Configuration directory has moved from `debba.sql` to `tabularis`. You may need to manually move your `connections.json` and `saved_queries.json` if they are not picked up.
-- **Rebranding:** The project is now **tabularis**.
-- **Secure Keychain Storage:**
-  - Integrated system keychain support (Linux Secret Service, macOS Keychain, Windows Credential Manager).
-  - Option to securely store database and SSH passwords instead of plain text configuration files.
-- **UX Improvements:**
-  - Enhanced SQL Editor UI with better resize handles and visibility toggles.
-  - Refined connection management flow.
-
-### 🚀 New in v0.5.0
-
-- **Advanced Schema Management:**
-  - **DataGrip-style Explorer:** Sidebar tables now expand to show columns, keys, foreign keys, and indexes.
-  - **Table Structure Modification:**
-    - **Manage Columns:** Add, modify, and delete columns with type, length, nullability, and default value support.
-    - **Manage Indexes:** Create and delete indexes (including Unique).
-    - **Manage Foreign Keys:** Create and delete foreign keys with support for ON DELETE/UPDATE actions.
-    - **Delete Table:** Context menu option to drop tables safely.
-- **Enhanced Data Editing:**
-  - **Smart Foreign Key Selection:** New/Edit Row modals now provide a rich dropdown for Foreign Keys, showing context from referenced tables (e.g. "ID - Name | Email") instead of just IDs.
-  - **Improved Inputs:** Auto-clearing of length for non-sized types (INT, BOOL) and better type handling.
-- **DataGrid Improvements:**
-  - **Row Selection:** Click row number to select, Shift+Click for range, Ctrl+Click for multiple.
-  - **Row Numbering:** Fixed column for row numbers similar to IDEs.
-- **Auto-Refresh:** Sidebar automatically refreshes structure after schema changes.
-
 ### 🔌 Connection Management
 
 - Support for **PostgreSQL**, **MySQL/MariaDB**, and **SQLite**.
