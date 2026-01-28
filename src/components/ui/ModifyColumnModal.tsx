@@ -224,9 +224,9 @@ export const ModifyColumnModal = ({
         
         onSuccess();
         onClose();
-    } catch (e: any) {
+    } catch (e) {
         console.error(e);
-        setError('Failed: ' + (e.message || String(e)));
+        setError('Failed: ' + (String(e)));
     } finally {
         setLoading(false);
     }

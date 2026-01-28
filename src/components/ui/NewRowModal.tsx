@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Loader2, Plus } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useDatabase } from "../../hooks/useDatabase";
@@ -41,10 +41,68 @@ export const NewRowModal = ({
   // FK Support
   const [foreignKeys, setForeignKeys] = useState<ForeignKey[]>([]);
   const [fkOptions, setFkOptions] = useState<
-    Record<string, { value: any; label: string }[]>
+    Record<string, { value: unknown; label: string }[]>
   >({}); // map column_name -> options
   const [loadingFk, setLoadingFk] = useState<Record<string, boolean>>({});
   const [fkErrors, setFkErrors] = useState<Record<string, string>>({});
+
+  const fetchFkOptions = useCallback(async (fk: ForeignKey) => {
+    if (!activeConnectionId) return;
+    setLoadingFk((prev) => ({ ...prev, [fk.column_name]: true }));
+    setFkErrors((prev) => ({ ...prev, [fk.column_name]: "" }));
+    try {
+      const q =
+        activeDriver === "mysql" || activeDriver === "mariadb" ? "`" : '"';
+      // Select * from referenced table to get context
+      const query = `SELECT * FROM ${q}${fk.ref_table}${q} LIMIT 100`;
+
+      const result = await invoke<{ columns: string[], rows: unknown[][] }>("execute_query", {
+        connectionId: activeConnectionId,
+        query,
+      });
+
+      const options = result.rows.map((rowArray) => {
+        // Convert row array to object using columns
+        const row: Record<string, unknown> = {};
+        result.columns.forEach((col, idx) => {
+            row[col] = rowArray[idx];
+        });
+
+        // Try to find value for ref_column (handle case sensitivity)
+        let val = row[fk.ref_column];
+        if (val === undefined) {
+          const key = Object.keys(row).find(
+            (k) => k.toLowerCase() === fk.ref_column.toLowerCase(),
+          );
+          if (key) val = row[key];
+        }
+
+        // Construct label from other columns
+        const labelParts = Object.entries(row)
+          .filter(
+            ([k]) =>
+              k !== fk.ref_column &&
+              k.toLowerCase() !== fk.ref_column.toLowerCase(),
+          )
+          .slice(0, 2) // Take first 2 other columns
+          .map(([, v]) => String(v));
+
+        const labelText = labelParts.join(" | ");
+
+        return {
+          value: val,
+          label: labelText ? `${val} - ${labelText}` : String(val),
+        };
+      });
+
+      setFkOptions((prev) => ({ ...prev, [fk.column_name]: options }));
+    } catch (e) {
+      console.error(`Failed to fetch FK options for ${fk.column_name}:`, e);
+      setFkErrors((prev) => ({ ...prev, [fk.column_name]: String(e) }));
+    } finally {
+      setLoadingFk((prev) => ({ ...prev, [fk.column_name]: false }));
+    }
+  }, [activeConnectionId, activeDriver]);
 
   useEffect(() => {
     if (isOpen && activeConnectionId && tableName) {
@@ -80,65 +138,7 @@ export const NewRowModal = ({
         .catch((err) => setError("Failed to load schema: " + err))
         .finally(() => setSchemaLoading(false));
     }
-  }, [isOpen, activeConnectionId, tableName]);
-
-  const fetchFkOptions = async (fk: ForeignKey) => {
-    if (!activeConnectionId) return;
-    setLoadingFk((prev) => ({ ...prev, [fk.column_name]: true }));
-    setFkErrors((prev) => ({ ...prev, [fk.column_name]: "" }));
-    try {
-      const q =
-        activeDriver === "mysql" || activeDriver === "mariadb" ? "`" : '"';
-      // Select * from referenced table to get context
-      const query = `SELECT * FROM ${q}${fk.ref_table}${q} LIMIT 100`;
-
-      const result = await invoke<{ columns: string[], rows: any[][] }>("execute_query", {
-        connectionId: activeConnectionId,
-        query,
-      });
-
-      const options = result.rows.map((rowArray) => {
-        // Convert row array to object using columns
-        const row: Record<string, any> = {};
-        result.columns.forEach((col, idx) => {
-            row[col] = rowArray[idx];
-        });
-
-        // Try to find value for ref_column (handle case sensitivity)
-        let val = row[fk.ref_column];
-        if (val === undefined) {
-          const key = Object.keys(row).find(
-            (k) => k.toLowerCase() === fk.ref_column.toLowerCase(),
-          );
-          if (key) val = row[key];
-        }
-
-        // Construct label from other columns
-        const labelParts = Object.entries(row)
-          .filter(
-            ([k, _]) =>
-              k !== fk.ref_column &&
-              k.toLowerCase() !== fk.ref_column.toLowerCase(),
-          )
-          .slice(0, 2) // Take first 2 other columns
-          .map(([_, v]) => String(v));
-
-        const labelText = labelParts.join(" | ");
-
-        return {
-          value: val,
-          label: labelText ? `${val} - ${labelText}` : String(val),
-        };
-      });
-
-      setFkOptions((prev) => ({ ...prev, [fk.column_name]: options }));
-    } catch (e) {
-      console.error(`Failed to fetch FK options for ${fk.column_name}:`, e);
-      setFkErrors((prev) => ({ ...prev, [fk.column_name]: String(e) }));
-    } finally {
-      setLoadingFk((prev) => ({ ...prev, [fk.column_name]: false }));
-    }
-  };
+  }, [isOpen, activeConnectionId, tableName, fetchFkOptions]);
 
   if (!isOpen) return null;
 

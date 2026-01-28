@@ -6,8 +6,31 @@ import { useDatabase } from '../hooks/useDatabase';
 
 export const EditorProvider = ({ children }: { children: ReactNode }) => {
   const { activeConnectionId } = useDatabase();
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeTabIds, setActiveTabIds] = useState<Record<string, string>>({}); // connectionId -> tabId
+  const [tabs, setTabs] = useState<Tab[]>(() => {
+    const saved = localStorage.getItem('sql_editor_tabs_v2');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.tabs || [];
+      } catch (e) {
+        console.error("Failed to load tabs", e);
+      }
+    }
+    return [];
+  });
+
+  const [activeTabIds, setActiveTabIds] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('sql_editor_tabs_v2');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.activeTabIds || {};
+      } catch (e) {
+        console.error("Failed to load activeTabIds", e);
+      }
+    }
+    return {};
+  });
   const tabsRef = useRef<Tab[]>([]);
 
   useEffect(() => {
@@ -31,19 +54,6 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       ...partial
     };
   }, [activeConnectionId]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('sql_editor_tabs_v2');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setTabs(parsed.tabs || []);
-        setActiveTabIds(parsed.activeTabIds || {});
-      } catch (e) {
-        console.error("Failed to load tabs", e);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('sql_editor_tabs_v2', JSON.stringify({ tabs, activeTabIds }));

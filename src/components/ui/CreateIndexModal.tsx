@@ -79,8 +79,8 @@ export const CreateIndexModal = ({
           await invoke('execute_query', { connectionId, query: sqlPreview });
           onSuccess();
           onClose();
-      } catch (e: any) {
-          setError(e.toString());
+      } catch (e) {
+          setError(String(e));
       } finally {
           setLoading(false);
       }

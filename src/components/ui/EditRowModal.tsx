@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useDatabase } from '../../hooks/useDatabase';
@@ -36,9 +36,50 @@ export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, co
   
   // FK Support
   const [foreignKeys, setForeignKeys] = useState<ForeignKey[]>([]);
-  const [fkOptions, setFkOptions] = useState<Record<string, { value: any, label: string }[]>>({});
+  const [fkOptions, setFkOptions] = useState<Record<string, { value: unknown, label: string }[]>>({});
   const [loadingFk, setLoadingFk] = useState<Record<string, boolean>>({});
   const [fkErrors, setFkErrors] = useState<Record<string, string>>({});
+
+  const fetchFkOptions = useCallback(async (fk: ForeignKey) => {
+      if (!activeConnectionId) return;
+      setLoadingFk(prev => ({ ...prev, [fk.column_name]: true }));
+      setFkErrors(prev => ({ ...prev, [fk.column_name]: '' }));
+      try {
+          const q = (activeDriver === 'mysql' || activeDriver === 'mariadb') ? '`' : '"';
+          const query = `SELECT * FROM ${q}${fk.ref_table}${q} LIMIT 100`;
+          
+          const result = await invoke<{ columns: string[], rows: unknown[][] }>('execute_query', { connectionId: activeConnectionId, query });
+          
+          const options = result.rows.map(rowArray => {
+              // Convert row array to object
+              const rowObj: Record<string, unknown> = {};
+              result.columns.forEach((col, idx) => {
+                  rowObj[col] = rowArray[idx];
+              });
+
+              let val = rowObj[fk.ref_column];
+              if (val === undefined) {
+                  const key = Object.keys(rowObj).find(k => k.toLowerCase() === fk.ref_column.toLowerCase());
+                  if (key) val = rowObj[key];
+              }
+              
+              const labelParts = Object.entries(rowObj)
+                  .filter(([k]) => k !== fk.ref_column && k.toLowerCase() !== fk.ref_column.toLowerCase())
+                  .slice(0, 2)
+                  .map(([, v]) => String(v));
+              const labelText = labelParts.join(' | ');
+              
+              return { value: val, label: labelText ? `${val} - ${labelText}` : String(val) };
+          });
+          
+          setFkOptions(prev => ({ ...prev, [fk.column_name]: options }));
+      } catch (e) {
+          console.error(e);
+          setFkErrors(prev => ({ ...prev, [fk.column_name]: String(e) }));
+      } finally {
+          setLoadingFk(prev => ({ ...prev, [fk.column_name]: false }));
+      }
+  }, [activeConnectionId, activeDriver]);
 
   // Fetch schema and FKs
   useEffect(() => {
@@ -56,48 +97,7 @@ export const EditRowModal = ({ isOpen, onClose, tableName, pkColumn, rowData, co
         })
         .catch(err => console.error('Failed to load schema for edit:', err));
     }
-  }, [isOpen, activeConnectionId, tableName]);
-
-  const fetchFkOptions = async (fk: ForeignKey) => {
-      if (!activeConnectionId) return;
-      setLoadingFk(prev => ({ ...prev, [fk.column_name]: true }));
-      setFkErrors(prev => ({ ...prev, [fk.column_name]: '' }));
-      try {
-          const q = (activeDriver === 'mysql' || activeDriver === 'mariadb') ? '`' : '"';
-          const query = `SELECT * FROM ${q}${fk.ref_table}${q} LIMIT 100`;
-          
-          const result = await invoke<{ columns: string[], rows: any[][] }>('execute_query', { connectionId: activeConnectionId, query });
-          
-          const options = result.rows.map(rowArray => {
-              // Convert row array to object
-              const rowObj: Record<string, any> = {};
-              result.columns.forEach((col, idx) => {
-                  rowObj[col] = rowArray[idx];
-              });
-
-              let val = rowObj[fk.ref_column];
-              if (val === undefined) {
-                  const key = Object.keys(rowObj).find(k => k.toLowerCase() === fk.ref_column.toLowerCase());
-                  if (key) val = rowObj[key];
-              }
-              
-              const labelParts = Object.entries(rowObj)
-                  .filter(([k, _]) => k !== fk.ref_column && k.toLowerCase() !== fk.ref_column.toLowerCase())
-                  .slice(0, 2)
-                  .map(([_, v]) => String(v));
-              const labelText = labelParts.join(' | ');
-              
-              return { value: val, label: labelText ? `${val} - ${labelText}` : String(val) };
-          });
-          
-          setFkOptions(prev => ({ ...prev, [fk.column_name]: options }));
-      } catch (e) {
-          console.error(e);
-          setFkErrors(prev => ({ ...prev, [fk.column_name]: String(e) }));
-      } finally {
-          setLoadingFk(prev => ({ ...prev, [fk.column_name]: false }));
-      }
-  };
+  }, [isOpen, activeConnectionId, tableName, fetchFkOptions]);
 
   // Initialize form data from rowData
   useEffect(() => {

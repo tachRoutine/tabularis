@@ -199,7 +199,7 @@ const SidebarTableItem = ({
     table: { name: string }; 
     activeTable: string | null;
     onTableClick: (name: string) => void;
-    onContextMenu: (e: React.MouseEvent, type: 'table', id: string, label: string) => void;
+    onContextMenu: (e: React.MouseEvent, type: string, id: string, label: string, data?: ContextMenuData) => void;
     connectionId: string;
     driver: string;
     onAddColumn: (tableName: string) => void;
@@ -223,29 +223,7 @@ const SidebarTableItem = ({
     const [indexes, setIndexes] = useState<Index[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     
-    useEffect(() => {
-        if (isExpanded) {
-            refreshMetadata();
-        }
-    }, [schemaVersion]); // Re-fetch when schema version bumps
-
-    // Sub-expansion states
-    const [expandColumns, setExpandColumns] = useState(true);
-    const [expandKeys, setExpandKeys] = useState(false);
-    const [expandIndexes, setExpandIndexes] = useState(false);
-
-    const handleExpand = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (isExpanded) {
-            setIsExpanded(false);
-            return;
-        }
-
-        setIsExpanded(true);
-        refreshMetadata();
-    };
-
-    const refreshMetadata = async () => {
+    const refreshMetadata = React.useCallback(async () => {
         if (!connectionId) return;
         setIsLoading(true);
         try {
@@ -264,12 +242,33 @@ const SidebarTableItem = ({
         } finally {
             setIsLoading(false);
         }
+    }, [connectionId, table.name]);
+    
+    useEffect(() => {
+        if (isExpanded) {
+            refreshMetadata();
+        }
+    }, [isExpanded, schemaVersion, refreshMetadata]); // Re-fetch when schema version bumps
+
+    // Sub-expansion states
+    const [expandColumns, setExpandColumns] = useState(true);
+    const [expandKeys, setExpandKeys] = useState(false);
+    const [expandIndexes, setExpandIndexes] = useState(false);
+
+    const handleExpand = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isExpanded) {
+            setIsExpanded(false);
+            return;
+        }
+
+        setIsExpanded(true);
+        refreshMetadata();
     };
     
     const showContextMenu = (e: React.MouseEvent, type: string, name: string) => {
         e.preventDefault();
         e.stopPropagation();
-        // @ts-ignore
         onContextMenu(e, type, name, name, { tableName: table.name });
     };
 
@@ -465,6 +464,8 @@ const SidebarTableItem = ({
     );
 };
 
+type ContextMenuData = SavedQuery | { tableName: string };
+
 export const Sidebar = () => {
   const { activeConnectionId, activeDriver, activeTable, setActiveTable, tables, isLoadingTables, refreshTables } = useDatabase();
   const { queries, deleteQuery, updateQuery } = useSavedQueries();
@@ -472,7 +473,7 @@ export const Sidebar = () => {
   const location = useLocation();
   const [schemaVersion, setSchemaVersion] = useState(0);
   
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'table' | 'query'; id: string; label: string; data?: SavedQuery } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: string; id: string; label: string; data?: ContextMenuData } | null>(null);
   const [schemaModalTable, setSchemaModalTable] = useState<string | null>(null);
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false);
   const [modifyColumnModal, setModifyColumnModal] = useState<{ isOpen: boolean; tableName: string; column: TableColumn | null }>({ isOpen: false, tableName: '', column: null });
@@ -504,9 +505,8 @@ export const Sidebar = () => {
     });
   };
 
-  const handleContextMenu = (e: React.MouseEvent, type: string, id: string, label: string, data?: SavedQuery) => {
+  const handleContextMenu = (e: React.MouseEvent, type: string, id: string, label: string, data?: ContextMenuData) => {
     e.preventDefault();
-    // @ts-ignore
     setContextMenu({ x: e.clientX, y: e.clientY, type, id, label, data });
   };
 
@@ -670,7 +670,6 @@ export const Sidebar = () => {
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           items={
-            // @ts-ignore
             contextMenu.type === 'table' ? [
                 {
                     label: 'Select Top 100',
@@ -724,7 +723,6 @@ export const Sidebar = () => {
                     }
                 }
             ] : 
-            // @ts-ignore
             contextMenu.type === 'index' ? [
                 {
                     label: 'Copy Name',
@@ -742,8 +740,7 @@ export const Sidebar = () => {
                         // Or parse it if we encoded it.
                         // Let's update `showContextMenu` to pass tableName in `data`.
                         if (contextMenu.data && 'tableName' in contextMenu.data) {
-                            // @ts-ignore
-                            const t = contextMenu.data.tableName;
+                                            const t = contextMenu.data.tableName;
                             if (await ask(`Delete index "${contextMenu.id}"?`, { title: 'Delete Index', kind: 'warning' })) {
                                 const q = (activeDriver === 'mysql' || activeDriver === 'mariadb') ? `DROP INDEX \`${contextMenu.id}\` ON \`${t}\`` : `DROP INDEX "${contextMenu.id}"`;
                                 await invoke('execute_query', { connectionId: activeConnectionId, query: q }).catch(console.error);
@@ -752,7 +749,6 @@ export const Sidebar = () => {
                     }
                 }
             ] :
-            // @ts-ignore
             contextMenu.type === 'foreign_key' ? [
                 {
                     label: 'Copy Name',
@@ -765,8 +761,7 @@ export const Sidebar = () => {
                     danger: true,
                     action: async () => {
                         if (contextMenu.data && 'tableName' in contextMenu.data) {
-                            // @ts-ignore
-                            const t = contextMenu.data.tableName;
+                                            const t = contextMenu.data.tableName;
                             if (await ask(`Delete foreign key "${contextMenu.id}"?`, { title: 'Delete FK', kind: 'warning' })) {
                                 if (activeDriver === 'sqlite') {
                                     await message('SQLite does not support dropping FKs via ALTER TABLE.', { kind: 'error' });
@@ -781,28 +776,24 @@ export const Sidebar = () => {
                     }
                 }
             ] :
-            // @ts-ignore
             contextMenu.type === 'folder_indexes' ? [
                 {
                     label: 'Add Index',
                     icon: Plus,
                     action: () => {
                         if (contextMenu.data && 'tableName' in contextMenu.data) {
-                            // @ts-ignore
-                            setCreateIndexModal({ isOpen: true, tableName: contextMenu.data.tableName });
+                                            setCreateIndexModal({ isOpen: true, tableName: contextMenu.data.tableName });
                         }
                     }
                 }
             ] :
-            // @ts-ignore
             contextMenu.type === 'folder_fks' ? [
                 {
                     label: 'Add Foreign Key',
                     icon: Plus,
                     action: () => {
                         if (contextMenu.data && 'tableName' in contextMenu.data) {
-                            // @ts-ignore
-                            setCreateForeignKeyModal({ isOpen: true, tableName: contextMenu.data.tableName });
+                                            setCreateForeignKeyModal({ isOpen: true, tableName: contextMenu.data.tableName });
                         }
                     }
                 }
@@ -813,14 +804,18 @@ export const Sidebar = () => {
                     label: 'Execute',
                     icon: Play,
                     action: () => {
-                        if (contextMenu.data?.sql) runQuery(contextMenu.data.sql, contextMenu.data.name);
+                        if (contextMenu.data && 'sql' in contextMenu.data) {
+                             runQuery(contextMenu.data.sql, contextMenu.data.name);
+                        }
                     }
                 },
                 {
                     label: 'Edit',
                     icon: Edit,
                     action: () => {
-                        setQueryModal({ isOpen: true, query: contextMenu.data });
+                         if (contextMenu.data && 'sql' in contextMenu.data) {
+                            setQueryModal({ isOpen: true, query: contextMenu.data as SavedQuery });
+                         }
                     }
                 },
                 {

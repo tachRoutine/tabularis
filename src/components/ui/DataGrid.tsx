@@ -148,6 +148,7 @@ export const DataGrid = ({ columns, data, tableName, pkColumn, connectionId, onR
     [columns, columnHelper]
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns: tableColumns,

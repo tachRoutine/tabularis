@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Play,
@@ -51,6 +51,12 @@ interface TableColumn {
   is_nullable: boolean;
 }
 
+interface EditorState {
+    initialQuery?: string;
+    tableName?: string;
+    queryName?: string;
+}
+
 export const Editor = () => {
   const { activeConnectionId } = useDatabase();
   const { settings } = useSettings();
@@ -84,6 +90,16 @@ export const Editor = () => {
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false);
   const [isEditingPage, setIsEditingPage] = useState(false);
   const [tempPage, setTempPage] = useState("1");
+
+  const activeTabType = activeTab?.type;
+  const activeTabQuery = activeTab?.query;
+
+  const dropdownQueries = useMemo(() => {
+    if (activeTabType === "query_builder" && activeTabQuery) {
+      return [activeTabQuery];
+    }
+    return selectableQueries;
+  }, [activeTabType, activeTabQuery, selectableQueries]);
 
   const tabsRef = useRef<Tab[]>([]);
   const activeTabIdRef = useRef<string | null>(null);
@@ -245,7 +261,7 @@ export const Editor = () => {
   };
 
   useEffect(() => {
-    const state = location.state as any;
+    const state = location.state as EditorState;
     if (activeConnectionId && state?.initialQuery) {
       const queryKey = `${state.initialQuery}-${state.tableName}-${state.queryName}`;
       if (processingRef.current === queryKey) return;
@@ -303,9 +319,9 @@ export const Editor = () => {
       if (!filePath) return;
       const headers = result.columns.join(",");
       const rows = result.rows
-        .map((row: any[]) =>
+        .map((row) =>
           row
-            .map((cell: any) => {
+            .map((cell) => {
               if (cell === null) return "NULL";
               const str = String(cell);
               return str.includes(",") ||
@@ -333,8 +349,8 @@ export const Editor = () => {
         defaultPath: `result_${Date.now()}.json`,
       });
       if (!filePath) return;
-      const data = result.rows.map((row: any[]) => {
-        const obj: any = {};
+      const data = result.rows.map((row) => {
+        const obj: Record<string, unknown> = {};
         result.columns.forEach((col, i) => (obj[col] = row[i]));
         return obj;
       });
@@ -347,13 +363,8 @@ export const Editor = () => {
 
   const handleRunDropdownToggle = useCallback(() => {
     if (!isRunDropdownOpen) {
-      // Visual Query Builder: use the generated query
-      if (activeTab?.type === "query_builder") {
-        const queries = activeTab.query ? [activeTab.query] : [];
-        setSelectableQueries(queries);
-      }
       // Monaco Editor: split queries from editor
-      else if (editorRef.current) {
+      if (activeTab?.type !== "query_builder" && editorRef.current) {
         const text = editorRef.current.getValue();
         const queries = splitQueries(text);
         setSelectableQueries(queries);
@@ -361,17 +372,6 @@ export const Editor = () => {
     }
     setIsRunDropdownOpen((prev) => !prev);
   }, [isRunDropdownOpen, activeTab]);
-
-  // Update dropdown queries when Visual Query Builder query changes
-  useEffect(() => {
-    if (
-      isRunDropdownOpen &&
-      activeTab?.type === "query_builder" &&
-      activeTab.query
-    ) {
-      setSelectableQueries([activeTab.query]);
-    }
-  }, [activeTab?.query, activeTab?.type, isRunDropdownOpen]);
 
   if (!activeTab) {
     return (
@@ -491,12 +491,12 @@ export const Editor = () => {
                   onClick={() => setIsRunDropdownOpen(false)}
                 />
                 <div className="absolute top-full left-0 mt-1 w-80 bg-slate-800 border border-slate-700 rounded shadow-xl z-50 flex flex-col py-1 max-h-80 overflow-y-auto">
-                  {selectableQueries.length === 0 ? (
+                  {dropdownQueries.length === 0 ? (
                     <div className="px-4 py-2 text-xs text-slate-500 italic">
                       No valid queries found
                     </div>
                   ) : (
-                    selectableQueries.map((q, i) => (
+                    dropdownQueries.map((q, i) => (
                       <div
                         key={i}
                         className="flex items-center border-b border-slate-700/50 last:border-0 hover:bg-slate-700/50 transition-colors group"
